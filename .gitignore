@@ -1,0 +1,6 @@
+my_env
+*.midi
+*.mid
+*.pdf
+*.swp
+__pycache__
