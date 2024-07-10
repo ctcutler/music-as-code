@@ -91,8 +91,7 @@ def ascii_to_midi(asciis, notes_per_beat, note_width, swing, tempo, file_name):
 
     left_swing = swing * ticks_per_pair
     right_swing = (1 - swing) * ticks_per_pair
-    left_end = int(note_width * left_swing)
-    right_end = int(note_width * right_swing)
+    left_end = right_end = int(note_width * right_swing)
     left_start = int(right_swing - right_end)
     right_start = int(left_swing - left_end)
 

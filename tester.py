@@ -44,10 +44,10 @@ test("even steven", expected, notes, length=.5, swing=.5)
 
 notes = "A3 B3 C3 D3"
 expected = [
-    on("A3", 0), off("A3", 180), 
-    on("B3", 180), off("B3", 60), 
-    on("C3", 60), off("C3", 180), 
-    on("D3", 180), off("D3", 60), 
+    on("A3", 0), off("A3", 60), 
+    on("B3", 300), off("B3", 60), 
+    on("C3", 60), off("C3", 60), 
+    on("D3", 300), off("D3", 60), 
 ]
 test("swung", expected, notes, length=.5, swing=.75)
 
@@ -62,54 +62,54 @@ test("even legato", expected, notes, length=1, swing=.5)
 
 notes = "A3 B3 C3 D3"
 expected = [
-    on("A3", 0), off("A3", 360), 
-    on("B3", 0), off("B3", 120), 
-    on("C3", 0), off("C3", 360), 
-    on("D3", 0), off("D3", 120), 
+    on("A3", 0), off("A3", 120), 
+    on("B3", 240), off("B3", 120), 
+    on("C3", 0), off("C3", 120), 
+    on("D3", 240), off("D3", 120), 
 ]
 test("swung legato", expected, notes, length=1, swing=.75)
 
 notes = "A3 == C3 D3"
 expected = [
     on("A3", 0), off("A3", 420), 
-    on("C3", 60), off("C3", 180), 
-    on("D3", 180), off("D3", 60), 
+    on("C3", 60), off("C3", 60), 
+    on("D3", 300), off("D3", 60), 
 ]
 test("tie within pair", expected, notes, length=.5, swing=.75)
 
 notes = "A3 B3 == D3"
 expected = [
-    on("A3", 0), off("A3", 180), 
-    on("B3", 180), off("B3", 300), 
-    on("D3", 180), off("D3", 60), 
+    on("A3", 0), off("A3", 60), 
+    on("B3", 300), off("B3", 180), 
+    on("D3", 300), off("D3", 60), 
 ]
 test("tie in two pairs", expected, notes, length=.5, swing=.75)
 
 notes = "A3 B3 == == == F3"
 expected = [
-    on("A3", 0), off("A3", 180), 
-    on("B3", 180), off("B3", 780), 
-    on("F3", 180), off("F3", 60), 
+    on("A3", 0), off("A3", 60), 
+    on("B3", 300), off("B3", 660), 
+    on("F3", 300), off("F3", 60), 
 ]
 test("tie over a pair", expected, notes, length=.5, swing=.75)
 
 notes = "-- -- C3 D3"
 expected = [
-    on("C3", 480), off("C3", 180), 
-    on("D3", 180), off("D3", 60), 
+    on("C3", 480), off("C3", 60), 
+    on("D3", 300), off("D3", 60), 
 ]
 test("rest within pair", expected, notes, length=.5, swing=.75)
 
 notes = "A3 -- -- D3"
 expected = [
-    on("A3", 0), off("A3", 180), 
-    on("D3", 660), off("D3", 60), 
+    on("A3", 0), off("A3", 60), 
+    on("D3", 780), off("D3", 60), 
 ]
 test("rest in two pairs", expected, notes, length=.5, swing=.75)
 
 notes = "A3 -- -- -- -- F3"
 expected = [
-    on("A3", 0), off("A3", 180), 
-    on("F3", 1140), off("F3", 60), 
+    on("A3", 0), off("A3", 60), 
+    on("F3", 1260), off("F3", 60), 
 ]
 test("rest over a pair", expected, notes, length=.5, swing=.75)
