@@ -1,4 +1,4 @@
-from asciimidi import play
+from asciimidi import play, Config
 
 tuning = """
 C3 == == == == == == ==
@@ -28,7 +28,8 @@ D4  D4  E4  E4  F4  F4  E4  E4
 G3  G3  G3  G3  G3  G3  G3  G3  
 """
 
-twelve_bar = [I, IV, I, I, IV, IV, I, I, V, IV, I, I]
-play(twelve_bar, notes_per_beat=1, note_width=.8, swing=.6, tempo=180, loops=10)
-#play([tuning], notes_per_beat=1, note_width=.8, swing=.5, tempo=10, loops=10)
+config = Config(note_width=.8, swing=.6, loops=10)
 
+twelve_bar = [I, IV, I, I, IV, IV, I, I, V, IV, I, I]
+play(twelve_bar, config)
+#play([tuning], Config(beats_per_minute=10, loops=10))
