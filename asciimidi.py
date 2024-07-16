@@ -1,3 +1,4 @@
+from collections import namedtuple
 import re
 import sys
 
@@ -5,10 +6,23 @@ from mido import MidiFile, MidiTrack, Message, MetaMessage, open_output, Backend
 
 ASCII_NOTE_RE = re.compile('(\D+)(\d+)(\+*)(\-*)')
 WS_RE = re.compile(' +')
-#MIDI_DEVICE = 'Elektron Model:Cycles'
-MIDI_DEVICE = 'FH-2'
-#MIDI_DEVICE = 'IAC Driver Bus 1'
-MIDI_FILE_NAME = 'new_song.mid'
+
+CONFIG_FIELD_DEFAULTS = {
+    "beats_per_minute": 120,
+    "symbols_per_beat": 2,
+    "note_width": .5,          
+    "swing": .5,               
+    "midi_device": "FH-2", # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
+    "midi_file_name": "new_song.mid",
+    "midi_backend": "mido.backends.portmidi",
+    "loops": 1,
+    # "beats_per_measure": 4, # haven't found a reason we need this yet
+}
+Config = namedtuple(
+    'Config', 
+    CONFIG_FIELD_DEFAULTS.keys(), 
+    defaults=CONFIG_FIELD_DEFAULTS.values()
+)
 
 midi_note_numbers = {
   'R': 0, 
@@ -35,17 +49,17 @@ def get_midi_note(note, octave):
     return midi_note_numbers[note] + (int(octave) * 12)
 
 rest_length = 0
-def process_note(track, channel, note, note_start, note_end):
+def process_symbol(track, channel, symbol, symbol_start, symbol_end):
     global rest_length
-    if note in ('---', '--'):
-        rest_length += note_start + note_end
+    if symbol in ('---', '--'):
+        rest_length += symbol_start + symbol_end
     else:
-        if note in ('===', '=='):
-            track[-1].time += note_start + note_end
+        if symbol in ('===', '=='):
+            track[-1].time += symbol_start + symbol_end
         else: 
-            m = ASCII_NOTE_RE.search(note)
-            note, octave, up_volume, down_volume = m.groups()
-            midi_note = get_midi_note(note, octave)
+            m = ASCII_NOTE_RE.search(symbol)
+            symbol, octave, up_volume, down_volume = m.groups()
+            midi_note = get_midi_note(symbol, octave)
             velocity = 60 
             velocity += 20 * len(up_volume) 
             velocity -= 20 * len(down_volume) 
@@ -57,7 +71,7 @@ def process_note(track, channel, note, note_start, note_end):
                     note=midi_note,
                     velocity=velocity,
                     # delta from preceding note_off (or start of song)
-                    time=rest_length+note_start
+                    time=rest_length+symbol_start
                 )
             )
             track.append(
@@ -67,18 +81,18 @@ def process_note(track, channel, note, note_start, note_end):
                     note=midi_note,
                     velocity=velocity,
                     # delta from preceding note_on
-                    time=note_end
+                    time=symbol_end
                 )
             )
 
         rest_length = 0
 
-def ascii_to_midi(asciis, notes_per_beat, note_width, swing, tempo, file_name):
+def ascii_to_midi(asciis, config):
     "Assumes asciis is a list of strings and each has same number of newlines"""
     mid = MidiFile()
     channel = 0
-    ticks_per_note = mid.ticks_per_beat // notes_per_beat
-    ticks_per_pair = 2 * ticks_per_note
+    ticks_per_symbol = mid.ticks_per_beat // config.symbols_per_beat
+    ticks_per_pair = 2 * ticks_per_symbol
     global rest_length
 
     # if single str, wrap in list
@@ -89,39 +103,39 @@ def ascii_to_midi(asciis, notes_per_beat, note_width, swing, tempo, file_name):
     zipped = zip(*split_by_newline)
     music = '\n'.join([' '.join(z) for z in zipped])
 
-    left_swing = swing * ticks_per_pair
-    right_swing = (1 - swing) * ticks_per_pair
-    left_end = right_end = int(note_width * right_swing)
+    left_swing = config.swing * ticks_per_pair
+    right_swing = (1 - config.swing) * ticks_per_pair
+    left_end = right_end = int(config.note_width * right_swing)
     left_start = int(right_swing - right_end)
     right_start = int(left_swing - left_end)
 
     for voice in music.strip().split('\n'):
         track = MidiTrack()
-        track.append(MetaMessage('set_tempo', tempo=bpm2tempo(tempo)))
-        notes = WS_RE.split(voice.strip())
-        note_pairs = zip(notes[0::2], notes[1::2])
+        track.append(MetaMessage('set_tempo', tempo=bpm2tempo(config.beats_per_minute)))
+        symbols = WS_RE.split(voice.strip())
+        symbol_pairs = zip(symbols[0::2], symbols[1::2])
 
         is_first_pair = True
-        for (left, right) in note_pairs:
-            process_note(track, channel, left, 0 if is_first_pair else left_start, left_end)
-            process_note(track, channel, right, right_start, right_end)
+        for (left, right) in symbol_pairs:
+            process_symbol(track, channel, left, 0 if is_first_pair else left_start, left_end)
+            process_symbol(track, channel, right, right_start, right_end)
             is_first_pair = False
 
         mid.tracks.append(track)
         channel += 1
         rest_length = 0
 
-    mid.save(file_name)
+    mid.save(config.midi_file_name)
 
     return mid
 
-def play(asciis, notes_per_beat, note_width, swing, tempo, loops=1):
-    ascii_to_midi(asciis, notes_per_beat, note_width, swing, tempo, MIDI_FILE_NAME)
-    portmidi = Backend('mido.backends.portmidi')
-    for i in range(loops):
-        with portmidi.open_output(MIDI_DEVICE) as midi_port:
+def play(asciis, config):
+    ascii_to_midi(asciis, config)
+    portmidi = Backend(config.midi_backend)
+    for i in range(config.loops):
+        with portmidi.open_output(config.midi_device) as midi_port:
             try:
-                for msg in MidiFile(MIDI_FILE_NAME).play():
+                for msg in MidiFile(config.midi_file_name).play():
                     print(msg)
                     midi_port.send(msg)
             except KeyboardInterrupt:
