@@ -109,7 +109,8 @@ def ascii_to_midi(asciis, config):
     left_start = int(right_swing - right_end)
     right_start = int(left_swing - left_end)
 
-    for voice in music.strip().split('\n'):
+    # reversed() so that the "bottom" voice is channel 0
+    for voice in reversed(music.strip().split('\n')):
         track = MidiTrack()
         track.append(MetaMessage('set_tempo', tempo=bpm2tempo(config.beats_per_minute)))
         symbols = WS_RE.split(voice.strip())
@@ -129,14 +130,24 @@ def ascii_to_midi(asciis, config):
 
     return mid
 
+def print_ascii(asciis):
+    for a in asciis:
+        print(a)
+        print()
+
 def play(asciis, config):
+    print_ascii(asciis)
     ascii_to_midi(asciis, config)
+
+    # user may pass None 
+    if not config.midi_device:
+        return 
+
     portmidi = Backend(config.midi_backend)
     for i in range(config.loops):
         with portmidi.open_output(config.midi_device) as midi_port:
             try:
                 for msg in MidiFile(config.midi_file_name).play():
-                    print(msg)
                     midi_port.send(msg)
             except KeyboardInterrupt:
                 midi_port.reset()
