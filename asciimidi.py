@@ -152,3 +152,10 @@ def play(asciis, config):
             except KeyboardInterrupt:
                 midi_port.reset()
                 sys.exit(1)
+
+def stack(layers):
+    return "\n".join(layers)
+
+def concat(measures):
+    layers = zip(*[measure.split("\n") for measure in measures])
+    return stack("   ".join(layer) for layer in layers)
