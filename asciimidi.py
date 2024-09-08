@@ -195,7 +195,19 @@ KEYS = {
     **{f"{key_root} minor": key_pitches(key_root, "minor", MINOR_SEMIS) for key_root in MINOR_KEYS}
 }
 
-INTERVAL_SEMITONES = {
+# mapped to in-key steps
+IN_KEY_INTERVALS = {
+    "2nd": 1,
+    "3rd": 2,
+    "4th": 3,
+    "5th": 4,
+    "6th": 5,
+    "7th": 6,
+    "8th": 7
+}
+
+# maps to semitones
+FIXED_INTERVALS = {
     "m2": 1,
     "M2": 2,
     "m3": 3,
@@ -207,19 +219,6 @@ INTERVAL_SEMITONES = {
     "M6": 9,
     "m7": 10,
     "M7": 11,
-}
-INVERTED_INTERVAL_SEMITONES = {
-    "m2": -11,
-    "M2": -10,
-    "m3": -9,
-    "M3": -8,
-    "P4": -7,
-    "TT": -6,
-    "P5": -5,
-    "m6": -4,
-    "M6": -3,
-    "m7": -2,
-    "M7": -1,
 }
 
 global_key = None
@@ -257,20 +256,34 @@ class Note:
         return self.pitch+str(self.octave)+self.up_volume+self.down_volume
 
     def __add__(self, other):
-        return add_scale_steps(self, other, self.key)
+        if isinstance(other, int):
+            return add_scale_steps(self, other, self.key)
+        elif other in IN_KEY_INTERVALS:
+            return add_scale_steps(self, IN_KEY_INTERVALS[other], self.key)
+        elif other in FIXED_INTERVALS:
+            return add_semitones(self, FIXED_INTERVALS[other])
+        else:
+            raise Exception(f"unexpected addend: {other}")
 
     def __sub__(self, other):
-        return self.__add__(self, -other, self.key)
+        if isinstance(other, int):
+            return add_scale_steps(self, -other, self.key)
+        elif other in IN_KEY_INTERVALS:
+            return add_scale_steps(self, -IN_KEY_INTERVALS[other], self.key)
+        elif other in FIXED_INTERVALS:
+            return add_semitones(self, -FIXED_INTERVALS[other])
+        else:
+            raise Exception(f"unexpected subtrahend: {other}")
 
 def n(s, key=None):
     return Note(s, key)
 
-def add_semitones(note, semitones, adjust_octave=True):
+def add_semitones(note, semitones):
     pitch, octave = note.pitch, note.octave
     pitches = FLAT_PITCHES if pitch[-1] == "b" else SHARP_PITCHES
     i = pitches.index(pitch)
     i += semitones
-    octave += i // len(pitches) if adjust_octave else 0
+    octave += i // len(pitches)
     pitch = pitches[i % len(pitches)]
 
     return n(pitch+str(octave))
@@ -295,37 +308,4 @@ def add_scale_steps(note, scale_steps, key=None):
 
     return n(new_pitch+str(new_octave))
     
-def interval(base_note, interval_type, inverted=False):
-    """
-    Takes a base note and an interval type and returns a (potentially inverted)
-    interval note.  See INTERVAL_STEPS for allowed interval types.
-    """
-    interval_semitones = INVERTED_INTERVAL_SEMITONES if inverted else INTERVAL_SEMITONES
-    return add_semitones(base_note, interval_semitones[interval_type])
-
-def semitone_distance(n1, n2):
-    """
-    returns the number of semitones between note1 and note2
-    """
-    n1_pitches = FLAT_PITCHES if n1.pitch.endswith("b") else SHARP_PITCHES
-    n2_pitches = FLAT_PITCHES if n2.pitch.endswith("b") else SHARP_PITCHES
-    n1_semis = n1_pitches.index(n1.pitch) + 12 * n1.octave
-    n2_semis = n2_pitches.index(n2.pitch) + 12 * n2.octave
-    return abs(n2_semis - n1_semis)
-
 # FIXME: move a bunch of this stuff to utils?
-
-def scale_interval(base_note, interval_size, key=None):
-    """
-    Takes a key, a base note, and an interval size (2-8) and return a
-    note that makes an interval of that size within the scale. 
-    """
-    if key:
-        set_key(key)
-    else:
-        key = global_key
-
-    assert interval_size > 1
-    assert interval_size < 9
-
-    return add_scale_steps(base_note, interval_size-1, key)
