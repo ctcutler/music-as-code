@@ -160,25 +160,41 @@ def concat(measures):
     layers = zip(*[measure.split("\n") for measure in measures])
     return stack("   ".join(layer) for layer in layers)
 
-DEGREES = [ "I", "II", "III", "IV", "V", "VI", "VII" ]
+def key_pitches(key_root, mode, semis):
+    pitches = SHARP_PITCHES if f"{key_root} {mode}" in SHARPS_KEYS else FLAT_PITCHES
+    root_index = pitches.index(key_root)
+    pitches_for_key = [ pitches[(root_index + i) % 12] for i in semis ]
+
+    # rotate list of pitches so they start with C/C#/Db to simplify octave shift calculations
+    if "C" in pitches_for_key:
+        start_index = pitches_for_key.index("C")
+    elif "C#" in pitches_for_key:
+        start_index = pitches_for_key.index("C#")
+    else:
+        assert "Db" in pitches_for_key
+        start_index = pitches_for_key.index("Db")
+
+    return pitches_for_key[start_index:] + pitches_for_key[:start_index]
+
 MAJOR_SEMIS = [ 0, 2, 4, 5, 7, 9, 11 ]
 MINOR_SEMIS = [ 0, 2, 3, 5, 7, 8, 10 ]
-MAJOR_DEGREES_TO_SEMIS = dict(zip(DEGREES, MAJOR_SEMIS))
-MAJOR_SEMIS_TO_DEGREES = dict(zip(MAJOR_SEMIS, DEGREES))
-MINOR_DEGREES_TO_SEMIS = dict(zip(DEGREES, MINOR_SEMIS))
-MINOR_SEMIS_TO_DEGREES = dict(zip(MINOR_SEMIS, DEGREES))
-MINOR_DEGREES_TO_SEMIS = {
-    "I": 0,
-    "II": 2,
-    "III": 3,
-    "IV": 5,
-    "V": 7,
-    "VI": 8,
-    "VII": 10,
+SHARP_PITCHES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+FLAT_PITCHES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+
+# according to https://en.wikipedia.org/wiki/Circle_of_fifths
+MAJOR_KEYS = [ "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" ]
+MINOR_KEYS = [ "C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B" ]
+
+# keys traditionally expressed with sharps, all other keys assumed to be expresed with flats
+SHARPS_KEYS = { "G major", "D major", "A major", "E major", "B major", "E minor", "B minor",
+    "F# minor", "C# minor", "G# minor" }
+
+# weird ** syntax combines two dicts
+KEYS = {
+    **{f"{key_root} major": key_pitches(key_root, "major", MAJOR_SEMIS) for key_root in MAJOR_KEYS},
+    **{f"{key_root} minor": key_pitches(key_root, "minor", MINOR_SEMIS) for key_root in MINOR_KEYS}
 }
-MINOR_SEMIS_TO_DEGREES = dict((v,k) for k,v in MINOR_DEGREES_TO_SEMIS.items())
-PITCHES = SHARP_PITCHES = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"]
-FLAT_PITCHES = ["A", "Bb", "B", "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab"]
+
 INTERVAL_SEMITONES = {
     "m2": 1,
     "M2": 2,
@@ -206,26 +222,79 @@ INVERTED_INTERVAL_SEMITONES = {
     "M7": -1,
 }
 
+global_key = None
+def set_key(key):
+    global global_key
+    root, mode = key.split()
+    assert root[0] in ("A", "B", "C", "D", "E", "F", "G")
+    assert len(root) < 3
+    if len(root) > 1: 
+        assert root[1] in ("#", "b")
+    assert mode.startswith("maj") or mode.startswith("min")
+    global_key = key
+
+class Note:
+    def __init__(self, s, key=None):
+        m = ASCII_NOTE_RE.search(s)
+        self.pitch, self.octave, self.up_volume, self.down_volume = m.groups()
+        self.octave = int(self.octave)
+        if key:
+            set_key(key)
+        else:
+            key = global_key
+        assert key
+        self.key = key
+
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__)
+            and self.__dict__ == other.__dict__)
+
+    def __hash__(self):
+        """Overrides the default implementation"""
+        return hash(tuple(sorted(self.__dict__.items())))
+
+    def __str__(self):
+        return self.pitch+str(self.octave)+self.up_volume+self.down_volume
+
+    def __add__(self, other):
+        return add_scale_steps(self, other, self.key)
+
+    def __sub__(self, other):
+        return self.__add__(self, -other, self.key)
+
+def n(s, key=None):
+    return Note(s, key)
+
 def add_semitones(note, semitones, adjust_octave=True):
-    pitch, octave = note[:-1], int(note[-1])
+    pitch, octave = note.pitch, note.octave
     pitches = FLAT_PITCHES if pitch[-1] == "b" else SHARP_PITCHES
     i = pitches.index(pitch)
     i += semitones
     octave += i // len(pitches) if adjust_octave else 0
     pitch = pitches[i % len(pitches)]
 
-    return pitch+str(octave)
-    
-def scale_note(key, mode, degree, octave):
-    if mode == "major":
-        degrees_to_semis = MAJOR_DEGREES_TO_SEMIS
-    elif mode == "minor":
-        degrees_to_semis = MINOR_DEGREES_TO_SEMIS
+    return n(pitch+str(octave))
+
+def add_scale_steps(note, scale_steps, key=None):
+    """
+    Takes a note, a number of scale steps, and key and returns a new note that is that
+    many steps away in that key.
+    """
+    if key:
+        set_key(key)
     else:
-        raise Exception(f"Unknown mode: {mode}")
+        key = global_key
+    assert key
+    key_pitches = KEYS[key]
 
-    return add_semitones(key+str(octave), degrees_to_semis[degree], adjust_octave=False)
+    # note: this only works because we rotate all key pitch lists to start with C/C#/Db
+    note_index = key_pitches.index(note.pitch) + (7 * note.octave)
+    new_index = note_index + scale_steps
+    new_pitch = key_pitches[new_index % 7]
+    new_octave = new_index // 7
 
+    return n(new_pitch+str(new_octave))
+    
 def interval(base_note, interval_type, inverted=False):
     """
     Takes a base note and an interval type and returns a (potentially inverted)
@@ -234,52 +303,29 @@ def interval(base_note, interval_type, inverted=False):
     interval_semitones = INVERTED_INTERVAL_SEMITONES if inverted else INTERVAL_SEMITONES
     return add_semitones(base_note, interval_semitones[interval_type])
 
-def semitone_distance(pitch1, pitch2):
+def semitone_distance(n1, n2):
     """
-    returns the number of semitones between pitch1 and pitch2; if pitch2 is lower than pitch1
-    pitch2 is assumed to be an octave above
+    returns the number of semitones between note1 and note2
     """
-    pitch1_semis = FLAT_PITCHES.index(pitch1) if pitch1[-1] == "b" else PITCHES.index(pitch1) 
-    pitch2_semis = FLAT_PITCHES.index(pitch2) if pitch2[-1] == "b" else PITCHES.index(pitch2) 
-    if pitch2_semis >= pitch1_semis:
-        return pitch2_semis - pitch1_semis
-    else:
-        return (len(PITCHES) + pitch2_semis) - pitch1_semis
+    n1_pitches = FLAT_PITCHES if n1.pitch.endswith("b") else SHARP_PITCHES
+    n2_pitches = FLAT_PITCHES if n2.pitch.endswith("b") else SHARP_PITCHES
+    n1_semis = n1_pitches.index(n1.pitch) + 12 * n1.octave
+    n2_semis = n2_pitches.index(n2.pitch) + 12 * n2.octave
+    return abs(n2_semis - n1_semis)
 
-def degree(key, mode, pitch):
-    semis = semitone_distance(key, pitch)
-    if mode == "major":
-        semis_to_degrees = MAJOR_SEMIS_TO_DEGREES
-    elif mode == "minor":
-        semis_to_degrees = MINOR_SEMIS_TO_DEGREES
-    else:
-        raise Exception(f"Unknown mode: {mode}")
+# FIXME: move a bunch of this stuff to utils?
 
-    return semis_to_degrees[semis]
-
-def scale_interval(key, mode, base_note, interval_size):
+def scale_interval(base_note, interval_size, key=None):
     """
     Takes a key, a base note, and an interval size (2-8) and return a
     note that makes an interval of that size within the scale. 
     """
+    if key:
+        set_key(key)
+    else:
+        key = global_key
 
-    # find the degree
-    pitch, octave = base_note[:-1], int(base_note[-1])
-    base_degree = degree(key, mode, pitch)
-    base_degree_index = DEGREES.index(base_degree)
-    c_degree = degree(key, mode, "C")
-    c_degree_index = DEGREES.index(c_degree)
-    interval_degree_index = base_degree_index + (interval_size-1)
+    assert interval_size > 1
+    assert interval_size < 9
 
-    # Use degree indexes (avoids comparing roman numeral degrees) to determine
-    # whether the interval degree is above or below the C (that is, in turn, above
-    # base degree).  This is totally obvious, right?
-    if c_degree_index < base_degree_index:
-        c_degree_index += len(DEGREES)
-    if interval_degree_index >= c_degree_index and c_degree_index != base_degree_index:
-        octave += 1
-
-    if interval_degree_index >= len(DEGREES):
-        interval_degree_index -= len(DEGREES)
-
-    return scale_note(key, mode, DEGREES[interval_degree_index], octave)
+    return add_scale_steps(base_note, interval_size-1, key)
