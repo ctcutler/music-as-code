@@ -9,6 +9,7 @@ def test(name, expected, actual):
 # str of Note
 test("str of note", "Ab2", str(n("Ab2", "A minor")))
 test("f string of note", "Ab2", f"{n('Ab2')}")
+test("f string of note with special formatting", "Ab2", f"{n('Ab2'):3}")
 
 # add in key
 set_key("G major")

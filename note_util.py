@@ -1,11 +1,16 @@
 from asciimidi import ASCII_NOTE_RE
 
 def stack(layers):
-    return "\n".join(layers)
+    return "\n".join(layer.strip("\n") for layer in layers)
 
 def concat(measures):
     layers = zip(*[measure.split("\n") for measure in measures])
     return stack("   ".join(layer) for layer in layers)
+
+def make_lines(bars):
+    return [
+        concat(bars[i:i+4]) for i in range(0, len(bars), 4)
+    ]
 
 def key_pitches(key_root, mode, semis):
     pitches = SHARP_PITCHES if f"{key_root} {mode}" in SHARPS_KEYS else FLAT_PITCHES
@@ -121,6 +126,9 @@ class Note:
             return add_semitones(self, -FIXED_INTERVALS[other])
         else:
             raise Exception(f"unexpected subtrahend: {other}")
+
+    def __format__(self, format_spec):
+        return format(str(self), format_spec)
 
 def n(s, key=None):
     return Note(s, key)
