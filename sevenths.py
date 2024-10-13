@@ -76,10 +76,6 @@ def song1():
         chord_bar(V, V, V7),
     ] * 8)
 
-def intro(i):
-    return f"""
---- --- --- --- --- --- --- {i:3}
-"""
 
 def figure(i, form="first", leadin=None):
     iii = i + 2
@@ -93,36 +89,48 @@ def figure(i, form="first", leadin=None):
         "first": f"""
 {vii:3} {v:3} === {iii:3} {v:3} === {vii:3} {leadin:3}
 """,
+        "first_alt": f"""
+{vii:3} {v:3} === {iii:3} {v:3} === {vi:3} {leadin:3}
+""",
         "second": f"""
 {vii:3} {v:3} === {iii:3} {v:3} === --- {leadin:3}
 """,
         "last": f"""
-{vii:3} {v:3} === {iii:3} {v:3} === --- ---
+{vii:3} {v:3} === {v:3} {i:3} === --- ---
 """,
-        "first_alt": f"""
-{vii:3} {v:3} === {iii:3} {v:3} === {vi:3} {leadin:3}
-"""
     }
 
     assert form in forms, f"unexpected form {form}"
 
     return forms[form]
 
-def outro(i):
-    return figure(i, form="last")
-
-def bass(i):
+def intro(i):
     return f"""
-{i-14:3} === === === === === === ===
+--- --- --- --- --- --- --- {i:3}
+"""
+
+def bass(p0, p1=None):
+    p0 -= 14
+    p1 = "===" if p1 is None else p1 - 14
+    return f"""
+{p0:3} === === === {p1:3} === === ===
+"""
+
+def rest():
+    return """
+--- --- --- --- --- --- --- ---
 """
 
 def song3():
     i = n("C3", "C major")
+    iii = i + 2
     iv = i + 3
+    v = i + 4
+    vi = i + 5
     return make_lines(
         stack(
             intro(i),
-            bass(i),
+            rest(),
         ),
         [
             stack(
@@ -131,7 +139,7 @@ def song3():
             ),
             stack(
                 figure(i, form="second", leadin=iv),
-                bass(i)
+                bass(iii)
             ),
             stack(
                 figure(iv, form="first_alt"), 
@@ -139,16 +147,16 @@ def song3():
             ),
             stack(
                 figure(iv, form="second", leadin=i),
-                bass(iv)
+                bass(vi, v)
             ),
-        ] * 4,
+        ] * 1,
         stack(
             figure(i, form="first"), 
             bass(i),
         ),
         stack(
-            outro(i),
-            bass(i),
+            figure(i, form="last"), 
+            bass(iii, i),
         ),
     )
 
