@@ -1,13 +1,26 @@
+from types import GeneratorType
+
 from asciimidi import ASCII_NOTE_RE
 
-def stack(layers):
+def handle_mixed_args(args):
+    result = []
+    for arg in args:
+        if isinstance(arg, list) or isinstance(arg, tuple) or isinstance(arg, GeneratorType):
+            result += arg
+        else:
+            result.append(arg)
+    return result
+
+def stack(*args):
+    layers = handle_mixed_args(args)
     return "\n".join(layer.strip("\n") for layer in layers)
 
 def concat(measures):
     layers = zip(*[measure.split("\n") for measure in measures])
     return stack("   ".join(layer) for layer in layers)
 
-def make_lines(bars):
+def make_lines(*args):
+    bars = handle_mixed_args(args)
     return [
         concat(bars[i:i+4]) for i in range(0, len(bars), 4)
     ]
