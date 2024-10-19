@@ -8,76 +8,22 @@ C3 == == == == == == ==
 C3 == == == == == == ==
 """
 
-def chord_bar(c0, c1, c2):
-    return f"""
-{c0[3]:3} === === --- {c1[3]:3} --- {c2[3]:3} ===
-{c0[1]:3} === === --- {c1[2]:3} --- {c2[2]:3} ===
-{c0[2]:3} === === --- {c1[1]:3} --- {c2[1]:3} ===
-{c0[0]:3} === === --- {c1[0]:3} --- {c2[0]:3} ===
+
+"""
+Next: 
+
+root sixteenth leading into the next measure
+whole note rest or tied end note at end at first but then start running the phrases together in the middle then space them out again at the end
+
+drop the leadin entirely when teh phrases are close together sometimes
+
+bounce back and forth between 3rd and 5th at end of the phrase
+
+thnk about the phrases as two bars long where sometimes the second bar is a held note or a rest
 """
 
-def eighths_bar(i0, i1):
-    return f"""
-{i0[1]:3} {i0[1]:3} {i0[1]:3} {i1[1]:3} {i1[1]:3} {i1[1]:3}
-{i0[0]:3} {i0[0]:3} {i0[0]:3} {i1[0]:3} {i1[0]:3} {i1[0]:3}
-"""
 
-def bass_bar(p0, p1):
-    return f"""
-{p0-14:3} --- {p0-14:3} {p1-14:3} --- {p1-14:3}
-"""
-
-def song2():
-    i = n("C3", "C major")
-    iv = i+3
-    v = i+4
-    vi = i-2
-    return make_lines([
-        stack([
-            eighths_bar((i, i+4), (i, i+6)),
-            bass_bar(i, v)
-        ]),
-        stack([
-            eighths_bar((iv, iv+4), (iv, iv+3)),
-            bass_bar(iv, iv)
-        ]),
-        stack([
-            eighths_bar((vi, vi+4), (vi, vi+5)),
-            bass_bar(vi, vi)
-        ]),
-        stack([
-            eighths_bar((v, v+4), (v, v+6)),
-            bass_bar(v, v)
-        ]),
-    ]*8)
-
-
-def song1():
-    i = n("C3", "C major")
-    ii = i+1
-    iii = i+2
-    iv = i+3
-    v = i+4
-    vi = i+5
-    vii = i+6
-
-    I = [i, i+2, i+4, i+7]
-    I7 = [i, i+2, i+4, i+"m7"]
-    III = [iii, iii+2, iii+4, iii+7]
-    VI = [vi, vi+2, vi+4, vi+7]
-    IV = [iv, iv+2, iv+4, iv+7]
-    V = [v, v+2, v+4, v+7]
-    V7 = [v, v+2, v+4, v+6]
-
-    return make_lines([
-        chord_bar(I, I, I7),
-        chord_bar(VI, VI, VI),
-        chord_bar(III, III, III),
-        chord_bar(V, V, V7),
-    ] * 8)
-
-
-def figure(i, form="first", leadin=None):
+def figure(i, form="first_7", leadin=None):
     iii = i + 2
     v = i + 4
     vi = i + 5
@@ -86,10 +32,11 @@ def figure(i, form="first", leadin=None):
     leadin = i if leadin is None else leadin
 
     forms = {
-        "first": f"""
+        # X X = X   X = X X
+        "first_7": f"""
 {vii:3} {v:3} === {iii:3} {v:3} === {vii:3} {leadin:3}
 """,
-        "first_alt": f"""
+        "first_6": f"""
 {vii:3} {v:3} === {iii:3} {v:3} === {vi:3} {leadin:3}
 """,
         "second": f"""
@@ -97,6 +44,36 @@ def figure(i, form="first", leadin=None):
 """,
         "last": f"""
 {vii:3} {v:3} === {v:3} {i:3} === --- ---
+""",
+        # X X = -   X = - X
+        "first_7_a": f"""
+{vii:3} {v:3} === --- {v:3} === --- {leadin:3}
+""",
+        "first_6_a": f"""
+{vii:3} {v:3} === --- {v:3} === --- {leadin:3}
+""",
+        "second_a": f"""
+{vii:3} {v:3} === --- {v:3} === --- {leadin:3}
+""",
+        # X X = X   - - X X
+        "first_7_b": f"""
+{vii:3} {v:3} === {iii:3} --- --- {vii:3} {leadin:3}
+""",
+        "first_6_b": f"""
+{vii:3} {v:3} === {iii:3} --- --- {vi:3} {leadin:3}
+""",
+        "second_b": f"""
+{vii:3} {v:3} === {iii:3} --- --- --- {leadin:3}
+""",
+        # X - - X   X = X X
+        "first_7_c": f"""
+{vii:3} --- --- {iii:3} {v:3} === {vii:3} {leadin:3}
+""",
+        "first_6_c": f"""
+{vii:3} --- --- {iii:3} {v:3} === {vi:3} {leadin:3}
+""",
+        "second_c": f"""
+{vii:3} --- --- {iii:3} {v:3} === --- {leadin:3}
 """,
     }
 
@@ -132,26 +109,72 @@ def song3():
             intro(i),
             rest(),
         ),
-        [
-            stack(
-                figure(i, form="first"), 
-                bass(i)
-            ),
-            stack(
-                figure(i, form="second", leadin=iv),
-                bass(iii)
-            ),
-            stack(
-                figure(iv, form="first_alt"), 
-                bass(iv)
-            ),
-            stack(
-                figure(iv, form="second", leadin=i),
-                bass(vi, v)
-            ),
-        ] * 1,
         stack(
-            figure(i, form="first"), 
+            figure(i, form="first_7_a"), 
+            bass(i)
+        ),
+        stack(
+            figure(i, form="second_a", leadin=iv),
+            bass(iii)
+        ),
+        stack(
+            figure(iv, form="first_6_a"), 
+            bass(iv)
+        ),
+        stack(
+            figure(iv, form="second_a", leadin=i),
+            bass(vi, v)
+        ),
+        stack(
+            figure(i, form="first_7_b"), 
+            bass(i)
+        ),
+        stack(
+            figure(i, form="second_b", leadin=iv),
+            bass(iii)
+        ),
+        stack(
+            figure(iv, form="first_6_b"), 
+            bass(iv)
+        ),
+        stack(
+            figure(iv, form="second_b", leadin=i),
+            bass(vi, v)
+        ),
+        stack(
+            figure(i, form="first_7_c"), 
+            bass(i)
+        ),
+        stack(
+            figure(i, form="second_c", leadin=iv),
+            bass(iii)
+        ),
+        stack(
+            figure(iv, form="first_6_c"), 
+            bass(iv)
+        ),
+        stack(
+            figure(iv, form="second_c", leadin=i),
+            bass(vi, v)
+        ),
+        stack(
+            figure(i, form="first_7"), 
+            bass(i)
+        ),
+        stack(
+            figure(i, form="second", leadin=iv),
+            bass(iii)
+        ),
+        stack(
+            figure(iv, form="first_6"), 
+            bass(iv)
+        ),
+        stack(
+            figure(iv, form="second", leadin=i),
+            bass(vi, v)
+        ),
+        stack(
+            figure(i, form="first_7"), 
             bass(i),
         ),
         stack(
@@ -160,6 +183,6 @@ def song3():
         ),
     )
 
-play(song3(), Config(beats_per_minute=72, note_width=.5))
+play(song3(), Config(beats_per_minute=92, note_width=.5))
 
 #play([TUNING], Config(beats_per_minute=10, loops=10))

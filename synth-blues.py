@@ -66,6 +66,6 @@ def song2():
 
     return make_lines(bars * 4)
 
-play(song2(), Config(beats_per_minute=82, note_width=.75, swing=.7))
+#play(song2(), Config(beats_per_minute=82, note_width=.75, swing=.7))
 
-#play([TUNING], Config(beats_per_minute=10, loops=10))
+play([TUNING], Config(beats_per_minute=10, loops=10))
