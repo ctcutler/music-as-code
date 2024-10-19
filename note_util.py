@@ -22,7 +22,7 @@ def concat(measures):
 def make_lines(*args):
     bars = handle_mixed_args(args)
     return [
-        concat(bars[i:i+4]) for i in range(0, len(bars), 4)
+        concat(bars[i:i+2]) for i in range(0, len(bars), 2)
     ]
 
 def key_pitches(key_root, mode, semis):
