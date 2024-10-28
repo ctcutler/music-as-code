@@ -2,9 +2,9 @@ from note_util import n, set_key
 
 def test(name, expected, actual):
     if expected == actual:
-        print(f"{name} PASSED")
+        print(f"PASSED: {name}")
     else:
-        print(f"{name} FAILED\nexpected: {expected}\nactual: {actual}")
+        print(f"FAILED: {name}\nexpected: {expected}\nactual: {actual}")
 
 # str of Note
 test("str of note", "Ab2", str(n("Ab2", "A minor")))
@@ -51,3 +51,12 @@ set_key("G major")
 test("subtract fixed interval from note", n("F#3"), n("G3")-"m2")
 test("subtract fixed interval from note (leave key)", n("F3"), n("G3")-"M2")
 
+## add/subtract in key after add/subtracting fixed interval
+## FIXME: let's not add this unless we need it
+#set_key("G major")
+#p = n("G3") + "m2"
+#test("add in key after adding fixed (out of key)", n("A3"), p + 1)
+#test("subtract in key after adding fixed (out of key)", n("G3"), p - 1)
+#p = n("A3") - "m2"
+#test("add in key after subtracting fixed (out of key)", n("A3"), p + 1)
+#test("subtract in key after subtracting adding fixed (out of key)", n("G3"), p - 1)

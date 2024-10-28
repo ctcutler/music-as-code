@@ -15,7 +15,8 @@ def stack(*args):
     layers = handle_mixed_args(args)
     return "\n".join(layer.strip("\n") for layer in layers)
 
-def concat(measures):
+def concat(*args):
+    measures = handle_mixed_args(args)
     layers = zip(*[measure.split("\n") for measure in measures])
     return stack("   ".join(layer) for layer in layers)
 
@@ -68,7 +69,7 @@ IN_KEY_INTERVALS = {
     "5th": 4,
     "6th": 5,
     "7th": 6,
-    "8th": 7
+    "oct": 7
 }
 
 # maps to semitones
@@ -84,6 +85,7 @@ FIXED_INTERVALS = {
     "M6": 9,
     "m7": 10,
     "M7": 11,
+    "P8": 12,
 }
 
 global_key = None
@@ -160,6 +162,19 @@ def add_scale_steps(note, scale_steps, key=None):
     """
     Takes a note, a number of scale steps, and key and returns a new note that is that
     many steps away in that key.
+
+    FIXME: if at some point we want to be able to add scale steps to a note not in the scale,
+    below is a way of thinking about it that might be intuitive:
+
+    Basically we've got a base note that's between two scale notes and we're being asked to 
+    add/subtract to/from that note.  
+
+    When I thought about it hard I assumed that it should round "away" from the 
+    direction of the operation so round down when adding and round up when subtracting.
+    E.g.: 
+
+    1.5 + 1 = 2
+    1.5 - 1 = 1
     """
     if key:
         set_key(key)
