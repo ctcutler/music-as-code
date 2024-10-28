@@ -31,7 +31,8 @@ def figure_b(i):
 {vii:3} === {v:3} === === === {iii:3} === {v:3} === === === --- --- --- ---
 """
 
-def rest(leadin):
+def rest(leadin=None):
+    leadin = "---" if leadin == None else leadin
     return f"""
 --- --- --- --- --- --- --- {leadin:3}
 """
@@ -43,42 +44,103 @@ def tied_note(leadin=None):
 """
 
 
-def bass(p0, p1=None):
+def bass(p0):
     p0 -= 14
-    p1 = "===" if p1 is None else p1 - 14
     return f"""
-{p0:3} === === === {p1:3} === === ===
+{p0:3} === === === === === === === === === === === === === === ===
+"""
+
+def bass_4(p0):
+    p0 -= 14
+    return f"""
+{p0:3} === === === === === === ===
 """
 
 
 def song():
     i = n("C3", "C major")
+    ii = i + 1
+    iii = i + 2
     iv = i + 3
+    v = i + 4
     vii = i + 6
     return make_lines(
-        rest(i), 
+        stack(
+            rest(i), 
+            rest(),
+        ),
 
-        # I
-        figure_a(i, note_5=vii),
-        rest(leadin=i), 
-        figure_b(i),
-        rest(leadin=i), 
+        [
+            # I
+            stack(
+                figure_a(i, note_5=vii),
+                bass(i),
+            ),
+            stack(
+                rest(leadin=i), 
+                rest(),
+            ),
+            stack(
+                figure_b(i),
+                bass(iii),
+            ),
+            stack(
+                rest(leadin=i), 
+                rest(),
+            ),
 
-        figure_a(i, note_5=vii),
-        tied_note(leadin=i), 
-        figure_b(i),
-        rest(leadin=iv), 
+            stack(
+                figure_a(i, note_5=vii),
+                bass(i),
+            ),
+            stack(
+                tied_note(leadin=i), 
+                rest(),
+            ),
+            stack(
+                figure_b(i),
+                bass(iii),
+            ),
+            stack(
+                rest(leadin=iv), 
+                rest(),
+            ),
 
-        # IV -> I
-        figure_a(iv, note_5=iv+5),
-        rest(leadin=iv), 
-        figure_b(iv),
-        rest(leadin=iv), 
+            # IV -> I
+            stack(
+                figure_a(iv, note_5=iv+5),
+                bass(iv),
+            ),
+            stack(
+                rest(leadin=iv), 
+                rest(),
+            ),
+            stack(
+                figure_b(iv),
+                bass(ii),
+            ),
+            stack(
+                rest(leadin=iv), 
+                rest(),
+            ),
 
-        figure_a(iv, note_5=iv+5, leadin=i),
-        figure_b(i), 
-        rest(leadin=i), 
-        figure_b(i), 
+            stack(
+                figure_a(iv, note_5=iv+5, leadin=i),
+                bass(iv),
+            ),
+            stack(
+                figure_b(i), 
+                bass(i),
+            ),
+            stack(
+                rest(leadin=i), 
+                rest(),
+            ),
+        ],
+        stack(
+            figure_b(i), 
+            bass(i)
+        )
     )
 
 play(song(), Config(beats_per_minute=92, note_width=.5, symbols_per_beat=4))
