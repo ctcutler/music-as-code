@@ -1,4 +1,4 @@
-from asciimidi import ascii_to_midi, get_midi_note, Config
+from asciimidi import ascii_to_midi, get_midi_note, Config, add_clock_messages
 from mido import Message
 
 TICKS_PER_BEAT = 480
@@ -120,3 +120,40 @@ expected = [
     on("F3", 1260), off("F3", 60), 
 ]
 test("rest over a pair", expected, notes, note_width=.5, swing=.75)
+
+
+# clock messages
+note_messages = [
+    Message('note_on', time=0),
+    Message('note_off', time=1),
+    Message('note_on', time=1),
+    Message('note_off', time=1),
+]
+actual = add_clock_messages(note_messages, 60, 4)
+expected = [
+    Message('start', time=0),
+    Message('clock', time=0),
+    Message('note_on', time=0),
+    Message('clock', time=.25),
+    Message('clock', time=.5),
+    Message('clock', time=.75),
+    Message('clock', time=1),
+    Message('note_off', time=1),
+    Message('clock', time=1.25),
+    Message('clock', time=1.5),
+    Message('clock', time=1.75),
+    Message('clock', time=2),
+    Message('note_on', time=2),
+    Message('clock', time=2.25),
+    Message('clock', time=2.5),
+    Message('clock', time=2.75),
+    Message('clock', time=3),
+    Message('note_off', time=3.0),
+    Message('stop', time=3.0),
+]
+if actual == expected:
+    print("clock messages PASSED")
+else:
+    e = [(mesg.type, mesg.time) for mesg in expected]
+    a = [(mesg.type, mesg.time) for mesg in actual]
+    print(f"clock messages FAILED\n{e}\n{a}")

@@ -1,6 +1,7 @@
 from collections import namedtuple
 import re
 import sys
+import time
 
 from mido import MidiFile, MidiTrack, Message, MetaMessage, open_output, Backend, bpm2tempo
 
@@ -135,6 +136,33 @@ def print_ascii(asciis):
         print(a)
         print()
 
+def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
+    """
+    Takes list of note messages where message.time is the offset in seconds since the previous
+    note and returns a new list of note and clock messages where message.time is a 0-based offset
+    (in seconds) from the start of the song.
+
+    Adds in a MIDI start message at the beginning and a MIDI stop message at the end.
+    """
+    qn_per_second = qn_per_minute / 60
+    pulses_per_second = qn_per_second * pulses_per_qn
+    seconds_per_pulse = 1 / pulses_per_second
+    all_messages = [Message('start', time=0.0)]
+    next_clock = 0.0
+    last_note = 0.0
+
+    for message in note_messages:
+        message.time += last_note
+        last_note = message.time
+
+        while next_clock <= message.time:
+            all_messages.append(Message('clock', time=next_clock))
+            next_clock += seconds_per_pulse
+        all_messages.append(message)
+
+    all_messages.append(Message('stop', time=all_messages[-1].time))
+    return all_messages
+
 def play(asciis, config):
     print_ascii(asciis)
     ascii_to_midi(asciis, config)
@@ -146,9 +174,20 @@ def play(asciis, config):
     portmidi = Backend(config.midi_backend)
     for i in range(config.loops):
         with portmidi.open_output(config.midi_device) as midi_port:
+            midi_file = MidiFile(config.midi_file_name)
+            messages = add_clock_messages(list(midi_file), config.beats_per_minute, 24)
+            start_time = time.time()
             try:
-                for msg in MidiFile(config.midi_file_name).play():
-                    midi_port.send(msg)
+                for message in messages:
+                    # after add_clock_messages, every message.time is a 0-based offset from
+                    # the start of the song, in seconds
+                    sleep_duration = (message.time + start_time) - time.time()
+                    if sleep_duration > 0.0:
+                        time.sleep(sleep_duration)
+                    if isinstance(message, MetaMessage):
+                        continue
+                    midi_port.send(message)
             except KeyboardInterrupt:
+                midi_port.send(Message('stop', time=time.time()))
                 midi_port.reset()
                 sys.exit(1)
