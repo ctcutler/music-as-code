@@ -69,7 +69,8 @@ IN_KEY_INTERVALS = {
     "5th": 4,
     "6th": 5,
     "7th": 6,
-    "oct": 7
+    "oct": 7,
+    "8th": 7,
 }
 
 # maps to semitones
