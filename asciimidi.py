@@ -10,12 +10,11 @@ WS_RE = re.compile(' +')
 
 CONFIG_FIELD_DEFAULTS = {
     "beats_per_minute": 120,
-    "symbols_per_beat": 2,
+    "symbols_per_beat": 2, # 2 means each symbol is an 8th note
     "note_width": .5,          
     "swing": .5,               
     "midi_device": "FH-2", # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
     "midi_file_name": "new_song.mid",
-    "midi_backend": "mido.backends.portmidi",
     "loops": 1,
     # "beats_per_measure": 4, # haven't found a reason we need this yet
 }
@@ -131,11 +130,6 @@ def ascii_to_midi(asciis, config):
 
     return mid
 
-def print_ascii(asciis):
-    for a in asciis:
-        print(a)
-        print()
-
 def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
     """
     Takes list of note messages where message.time is the offset in seconds since the previous
@@ -164,16 +158,15 @@ def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
     return all_messages
 
 def play(asciis, config):
-    print_ascii(asciis)
     ascii_to_midi(asciis, config)
 
     # user may pass None 
     if not config.midi_device:
         return 
 
-    portmidi = Backend(config.midi_backend)
+    backend = Backend()
     for i in range(config.loops):
-        with portmidi.open_output(config.midi_device) as midi_port:
+        with backend.open_output(config.midi_device) as midi_port:
             midi_file = MidiFile(config.midi_file_name)
             messages = add_clock_messages(list(midi_file), config.beats_per_minute, 24)
             start_time = time.time()

@@ -5,6 +5,7 @@ python3.7 -m venv my_env
 source my_env/bin/activate
 pip install --upgrade pip
 pip install mido
+pip install mido\[ports-rtmidi\]
 pip freeze > requirements.txt
 pip install -r requirements.txt
 deactivate

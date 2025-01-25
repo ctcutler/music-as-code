@@ -20,6 +20,11 @@ def concat(*args):
     layers = zip(*[measure.split("\n") for measure in measures])
     return stack("   ".join(layer) for layer in layers)
 
+def print_ascii(asciis):
+    for a in asciis:
+        print(a)
+        print()
+
 def make_lines(*args):
     bars = handle_mixed_args(args)
     return [
