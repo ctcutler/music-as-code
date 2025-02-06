@@ -5,7 +5,7 @@ import time
 
 from mido import MidiFile, MidiTrack, Message, MetaMessage, open_output, Backend, bpm2tempo
 
-ASCII_NOTE_RE = re.compile('(\D+)(\d+)(\+*)(\-*)')
+ASCII_NOTE_RE = re.compile('(\D*)(\d+)(\+*)(\-*)')
 WS_RE = re.compile(' +')
 
 CONFIG_FIELD_DEFAULTS = {
@@ -59,7 +59,11 @@ def process_symbol(track, channel, symbol, symbol_start, symbol_end):
         else: 
             m = ASCII_NOTE_RE.search(symbol)
             symbol, octave, up_volume, down_volume = m.groups()
-            midi_note = get_midi_note(symbol, octave)
+            if symbol:
+                midi_note = get_midi_note(symbol, octave)
+            else:
+                # when the symbol is missing, treat the octave as a MIDI note number (0-127) instead
+                midi_note = int(octave)
             velocity = 60 
             velocity += 20 * len(up_volume) 
             velocity -= 20 * len(down_volume) 

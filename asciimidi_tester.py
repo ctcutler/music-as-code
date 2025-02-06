@@ -7,6 +7,15 @@ TICKS_PER_NOTE = TICKS_PER_BEAT // SYMBOLS_PER_BEAT
 VELOCITY = 60
 CHANNEL = 0
 
+def make_raw_note_message(mesg, raw_note, time):
+    return Message(
+        mesg,
+        channel=CHANNEL,
+        note=raw_note,
+        velocity=VELOCITY,
+        time=time
+    )
+
 def make_message(mesg, note, time):
     return Message(
         mesg,
@@ -157,3 +166,13 @@ else:
     e = [(mesg.type, mesg.time) for mesg in expected]
     a = [(mesg.type, mesg.time) for mesg in actual]
     print(f"clock messages FAILED\n{e}\n{a}")
+
+
+notes = "10 === --- 100"
+expected = [
+    make_raw_note_message('note_on', 10, 0),
+    make_raw_note_message('note_off', 10, 360),
+    make_raw_note_message('note_on', 100, 360),
+    make_raw_note_message('note_off', 100, 120),
+]
+test("raw notes", expected, notes, note_width=.5, swing=.5)
