@@ -49,12 +49,15 @@ def key_pitches(key_root, mode, semis):
 
 MAJOR_SEMIS = [ 0, 2, 4, 5, 7, 9, 11 ]
 MINOR_SEMIS = [ 0, 2, 3, 5, 7, 8, 10 ]
+PHRYGIAN_SEMIS = [ 0, 1, 3, 5, 7, 8, 10 ]
 SHARP_PITCHES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 FLAT_PITCHES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
 
 # according to https://en.wikipedia.org/wiki/Circle_of_fifths
 MAJOR_KEYS = [ "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" ]
 MINOR_KEYS = [ "C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B" ]
+# no idea what's "correct" but this appears to work
+PHRYGIAN_KEYS = [ "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" ]
 
 # keys traditionally expressed with sharps, all other keys assumed to be expresed with flats
 SHARPS_KEYS = { "G major", "D major", "A major", "E major", "B major", "E minor", "B minor",
@@ -63,35 +66,57 @@ SHARPS_KEYS = { "G major", "D major", "A major", "E major", "B major", "E minor"
 # weird ** syntax combines two dicts
 KEYS = {
     **{f"{key_root} major": key_pitches(key_root, "major", MAJOR_SEMIS) for key_root in MAJOR_KEYS},
-    **{f"{key_root} minor": key_pitches(key_root, "minor", MINOR_SEMIS) for key_root in MINOR_KEYS}
+    **{f"{key_root} minor": key_pitches(key_root, "minor", MINOR_SEMIS) for key_root in MINOR_KEYS},
+    **{f"{key_root} phrygian": key_pitches(key_root, "phrygian", PHRYGIAN_SEMIS) for key_root in PHRYGIAN_KEYS}
 }
+
+oct = "eighth"
+second = "2nd"
+third = "3rd"
+fourth = "4th"
+fifth = "5th"
+sixth = "6th"
+seventh = "7th"
+eighth = "eighth"
+m2 = "m2"
+M2 = "M2"
+m3 = "m3"
+M3 = "M3"
+P4 = "P4"
+TT = "TT"
+P5 = "P5"
+m6 = "m6"
+M6 = "M6"
+m7 = "m7"
+M7 = "M7"
+P8 = "P8"
 
 # mapped to in-key steps
 IN_KEY_INTERVALS = {
-    "2nd": 1,
-    "3rd": 2,
-    "4th": 3,
-    "5th": 4,
-    "6th": 5,
-    "7th": 6,
-    "oct": 7,
-    "8th": 7,
+    second: 1,
+    third: 2,
+    fourth: 3,
+    fifth: 4,
+    sixth: 5,
+    seventh: 6,
+    oct: 7,
+    eighth: 7,
 }
 
 # maps to semitones
 FIXED_INTERVALS = {
-    "m2": 1,
-    "M2": 2,
-    "m3": 3,
-    "M3": 4,
-    "P4": 5,
-    "TT": 6,
-    "P5": 7,
-    "m6": 8,
-    "M6": 9,
-    "m7": 10,
-    "M7": 11,
-    "P8": 12,
+    m2: 1,
+    M2: 2,
+    m3: 3,
+    M3: 4,
+    P4: 5,
+    TT: 6,
+    P5: 7,
+    m6: 8,
+    M6: 9,
+    m7: 10,
+    M7: 11,
+    P8: 12,
 }
 
 global_key = None
@@ -102,7 +127,7 @@ def set_key(key):
     assert len(root) < 3
     if len(root) > 1: 
         assert root[1] in ("#", "b")
-    assert mode.startswith("maj") or mode.startswith("min")
+    assert mode.startswith("maj") or mode.startswith("min") or mode.startswith("phr")
     global_key = key
 
 class Note:
