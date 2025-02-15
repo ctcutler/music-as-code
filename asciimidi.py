@@ -13,7 +13,7 @@ CONFIG_FIELD_DEFAULTS = {
     "symbols_per_beat": 2, # 2 means each symbol is an 8th note
     "note_width": .5,          
     "swing": .5,               
-    "midi_device": "FH-2", # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
+    "midi_devices": ["FH-2"], # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
     "midi_file_name": "new_song.mid",
     "loops": 1,
     # "beats_per_measure": 4, # haven't found a reason we need this yet
@@ -161,30 +161,45 @@ def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
     all_messages.append(Message('stop', time=all_messages[-1].time))
     return all_messages
 
+def multi_port_play(midi_ports, config):
+    midi_file = MidiFile(config.midi_file_name)
+    messages = add_clock_messages(list(midi_file), config.beats_per_minute, 24)
+    start_time = time.time()
+    try:
+        for message in messages:
+            # after add_clock_messages, every message.time is a 0-based offset from
+            # the start of the song, in seconds
+            sleep_duration = (message.time + start_time) - time.time()
+            if sleep_duration > 0.0:
+                time.sleep(sleep_duration)
+            if isinstance(message, MetaMessage):
+                continue
+            for midi_port in midi_ports:
+                midi_port.send(message)
+    except KeyboardInterrupt:
+        for midi_port in midi_ports:
+            midi_port.send(Message('stop', time=time.time()))
+            midi_port.reset()
+        sys.exit(1)
+
 def play(asciis, config):
     ascii_to_midi(asciis, config)
 
     # user may pass None 
-    if not config.midi_device:
+    if not config.midi_devices:
         return 
 
     backend = Backend()
     for i in range(config.loops):
-        with backend.open_output(config.midi_device) as midi_port:
-            midi_file = MidiFile(config.midi_file_name)
-            messages = add_clock_messages(list(midi_file), config.beats_per_minute, 24)
-            start_time = time.time()
-            try:
-                for message in messages:
-                    # after add_clock_messages, every message.time is a 0-based offset from
-                    # the start of the song, in seconds
-                    sleep_duration = (message.time + start_time) - time.time()
-                    if sleep_duration > 0.0:
-                        time.sleep(sleep_duration)
-                    if isinstance(message, MetaMessage):
-                        continue
-                    midi_port.send(message)
-            except KeyboardInterrupt:
-                midi_port.send(Message('stop', time=time.time()))
-                midi_port.reset()
-                sys.exit(1)
+        assert(len(config.midi_devices) < 3)
+
+        if len(config.midi_devices) == 2:
+            with (
+                backend.open_output(config.midi_devices[0]) as midi_port1,
+                backend.open_output(config.midi_devices[1]) as midi_port2
+            ):
+                multi_port_play([midi_port1, midi_port2], config)
+        else: 
+            with backend.open_output(config.midi_devices[0]) as midi_port:
+                multi_port_play([midi_port], config)
+
