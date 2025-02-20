@@ -24,7 +24,7 @@ Config = namedtuple(
     defaults=CONFIG_FIELD_DEFAULTS.values()
 )
 
-midi_note_numbers = {
+old_midi_note_numbers = {
   'R': 0, 
   'C': 24, 
   'C#': 25,
@@ -43,6 +43,26 @@ midi_note_numbers = {
   'A#': 34,
   'Bb': 34,
   'B': 35, 
+}
+midi_note_numbers = {
+  'R': 0, 
+  'C': 12, 
+  'C#': 13,
+  'Db': 13,
+  'D': 14, 
+  'D#': 15,
+  'Eb': 15,
+  'E': 16, 
+  'F': 17,
+  'F#': 18,
+  'Gb': 18,
+  'G': 19, 
+  'G#': 20,
+  'Ab': 20,
+  'A': 21, 
+  'A#': 22,
+  'Bb': 22,
+  'B': 23, 
 }
 
 def get_midi_note(note, octave):
