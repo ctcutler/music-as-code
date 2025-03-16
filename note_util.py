@@ -70,7 +70,8 @@ KEYS = {
     **{f"{key_root} phrygian": key_pitches(key_root, "phrygian", PHRYGIAN_SEMIS) for key_root in PHRYGIAN_KEYS}
 }
 
-oct = "eighth"
+oct = "eighth" # deprecated because shadows a built-in function
+octave = "eighth"
 second = "2nd"
 third = "3rd"
 fourth = "4th"
