@@ -30,4 +30,74 @@ deactivate
   - ... and perhaps compose differently because we have the structural aspects at our
     fingertips
 
-# ASCII Format
+# Examples
+Some music:
+```
+--- --- --- E4  --- --- --- E4
+--- --- G3  --- --- --- G3  ---
+--- C3  --- --- --- C3  --- ---
+C2  --- --- --- C2  --- --- ---
+
+--- --- --- F4  --- --- --- F4
+--- --- B3  --- --- --- B3  ---
+--- G3  --- --- --- G3  --- ---
+G2  --- --- --- G2  --- --- ---
+
+--- --- E4  --- --- --- --- E4
+--- G3  --- --- --- G3  --- ---
+--- --- --- C3  --- --- C3  ---
+C2  --- --- --- C2  --- --- ---
+
+--- --- F4  --- --- --- --- F4
+--- B3  --- --- --- B3  --- ---
+--- --- --- G3  --- --- G3  ---
+G2  --- --- --- G2  --- --- ---
+```
+
+The code that generated it:
+```
+from asciimidi import play, Config
+from note_util import stack, make_lines, Note, set_key, print_ascii, second, third, fourth, fifth, sixth, seventh, oct
+
+
+def arp_chord(p0, p1, p2, p3):
+    return f"""
+--- --- --- {p3:3} --- --- --- {p3:3}
+--- --- {p2:3} --- --- --- {p2:3} ---
+--- {p1:3} --- --- --- {p1:3} --- ---
+{p0:3} --- --- --- {p0:3} --- --- ---
+"""
+
+
+def scatter_chord(p0, p1, p2, p3):
+    return f"""
+--- --- {p3:3} --- --- --- --- {p3:3}
+--- {p2:3} --- --- --- {p2:3} --- ---
+--- --- --- {p1:3} --- --- {p1:3} ---
+{p0:3} --- --- --- {p0:3} --- --- ---
+"""
+
+
+def chord_seq(chord_func):
+    C = Note("C3", "C major")
+    G = C + fifth
+
+    bars = [
+        chord_func(C-oct, C, C+fifth, C+oct+third),
+        chord_func(G-oct, G, G+third, G+seventh),
+    ]
+
+    return bars
+
+
+def song():
+    scatter_chords = chord_seq(scatter_chord)
+    arp_chords = chord_seq(arp_chord)
+
+    bars = arp_chords + scatter_chords
+
+    print_ascii(bars)
+    return make_lines(bars)
+
+play(song(), Config(beats_per_minute=122, symbols_per_beat=2, midi_devices=['IAC Driver Bus 1']))
+```
