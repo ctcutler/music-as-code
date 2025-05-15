@@ -26,6 +26,34 @@ class Notes(Node):
     def __repr__(self):
         return repr(self.notes)
 
+
+def preprocess(s):
+    """
+    Recursively expands out all alternative cycles by making copies of the whole string
+    starting with the most deeply nested alternative cycles.
+    """
+    start = None
+    end = None
+
+    # find the first complete angle bracket pair, a.k.a. the first one that doesn't
+    # have another nested within it
+    for (i, c) in enumerate(s):
+        if c == "<":
+            start = i
+        elif c == ">":
+            end = i+1
+            break
+
+    if start is not None and end is not None:
+        alternative_cycle = s[start:end]
+        cycle_elements = alternative_cycle.strip("<>").split(" ")
+        copies = [
+            preprocess(f"{s[:start]}{element}{s[end:]}") for element in cycle_elements
+        ]
+        return " ".join(copies)
+    else:
+        return s
+
 def parse(s):
     cur_node = AlternativeCycle()
     stack = []
@@ -162,3 +190,20 @@ test_raises("test open without close", parse, "a b c]")
 test_raises("close without open", parse, "a b c]")
 test_raises("mixed bracket types", parse, "[a b c>")
 
+test(
+    "preprocess simple AC",
+    "[a b c] [a b d]",
+    preprocess("[a b <c d>]")
+)
+
+test(
+    "preprocess non-nested ACs",
+    "[a b c [e f]] [a b c [e g]] [a b d [e f]] [a b d [e g]]",
+    preprocess("[a b <c d> [e <f g>]]")
+)
+
+test(
+    "preprocess nested ACs",
+    "[a b c] [a b d] [a b c] [a b e]",
+    preprocess("[a b <c <d e>>]")
+)
