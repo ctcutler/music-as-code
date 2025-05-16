@@ -1,30 +1,26 @@
-class Node:
+from fractions import Fraction
+
+class Cycle():
     def __init__(self, children=None):
         self.children = children or []
 
     def __eq__(self, other):
         return self.children == other.children
 
-class DividedCycle(Node):
     def __repr__(self):
-        return "DividedCycle: " + repr(self.children)
+        return "Cycle: " + repr(self.children)
 
-class AlternativeCycle(Node):
-    def __repr__(self):
-        return "AlternativeCycle: " + repr(self.children)
-
-class Notes(Node):
+class Notes():
     def __init__(self, notes=None):
-        super().__init__()
         self.notes = notes or []
 
     def __eq__(self, other):
         if not isinstance(other, Notes):
             return False
-        return self.notes == other.notes and super().__eq__(other)
+        return self.notes == other.notes
 
     def __repr__(self):
-        return repr(self.notes)
+        return "Notes: "+repr(self.notes)
 
 
 def preprocess(s):
@@ -55,43 +51,67 @@ def preprocess(s):
         return s
 
 def parse(s):
-    cur_node = AlternativeCycle()
+    cycles = []
     stack = []
     literal = ""
 
     for c in s:
-        if c in {"[", "<"}:
-            stack.append(cur_node)
-            if c == "[":
-                cur_node = DividedCycle()
-            else:
-                cur_node = AlternativeCycle()
-        elif c in {" ", "\n", "\t", "]", ">"}:
+        if c == "[":
+            cycle = Cycle()
+
+            if len(stack) > 0:
+                stack[-1].children.append(cycle)
+
+            stack.append(cycle)
+        elif c in {" ", "\n", "\t", "]"}:
             if literal:
-                cur_node.children.append(Notes(literal.split(",")))
-            literal = ""
-            if c in {"]", ">"}:
-                if not stack:
-                    raise Exception(f"Unbalanced brackets in {s}")
+                notes = Notes(literal.split(","))
+                stack[-1].children.append(notes)
+                literal = ""
 
-                if isinstance(cur_node, AlternativeCycle) and c == "]":
-                    raise Exception(f"Unbalanced brackets in {s}")
+            if c == "]":
+                node = stack.pop()
 
-                if isinstance(cur_node, DividedCycle) and c == ">":
-                    raise Exception(f"Unbalanced brackets in {s}")
-
-                stack[-1].children.append(cur_node)
-                cur_node = stack.pop()
+                if len(stack) == 0:
+                    cycles.append(node)
         else:
             literal += c
 
-    if literal:
-        cur_node.children.append(Notes(literal.split(",")))
-
-    if stack:
+    if len(stack) > 0:
         raise Exception(f"Unbalanced brackets in {s}")
 
-    return cur_node
+    return cycles
+
+# TODO: fix name: not really generating nodes, generating events
+def generate_nodes(nodes):
+    events = []
+    for (i, node) in enumerate(nodes):
+        events += generate_node(node, Fraction(i), Fraction(i+1))
+
+    return events
+
+def generate_node(node, start, end):
+    if isinstance(node, Notes):
+        return (node.notes, start, end)
+    elif isinstance(node, Cycle):
+        time_increment = (end - start) / len(node.children)
+        notes = []
+        for (i, child) in enumerate(node.children):
+            generated = generate_node(
+                child,
+                start + (time_increment * i),
+                start + (time_increment * (i + 1))
+            )
+            if isinstance(generated, list):
+                notes += generated
+            elif isinstance(generated, tuple):
+                notes.append(generated)
+            else:
+                raise Exception(f"generate_node() returned value: {generated}")
+
+        return notes
+    else:
+        raise Exception(f"unexpected node: {node}")
 
 def test(name, expected, actual):
     if expected == actual:
@@ -108,87 +128,69 @@ def test_raises(name, func, param):
         print(f"FAILED: {name} No exception thrown!")
 
 test(
-    "one level, divided cycle",
-    AlternativeCycle([
-        DividedCycle([
-            Notes(["a"]),
-            Notes(["b"]),
-            Notes(["c"]),
-        ])
-    ]),
-    parse("[a b c]")
+    "one level, one cycle",
+    [Cycle([ Notes(["a"]), Notes(["b"]), Notes(["c"]), ])],
+    parse(preprocess("[a b c]"))
 )
 
 test(
-    "one level, alternative cycle",
-    AlternativeCycle([
-        Notes(["a"]),
-        Notes(["b"]),
-        Notes(["c"]),
-    ]),
-    parse("a b c")
+    "one level, three cycles",
+    [
+        Cycle([Notes(["a"])]),
+        Cycle([Notes(["b"])]),
+        Cycle([Notes(["c"])]),
+    ],
+    parse(preprocess("<[a] [b] [c]>"))
 )
-
-test(
-    "two levels of alternative cycles",
-    AlternativeCycle([
-        AlternativeCycle([
-            Notes(["a"]),
-            Notes(["b"]),
-            Notes(["c"]),
-        ])
-    ]),
-    parse("<a b c>")
-)
-
 
 test(
     "three level nesting",
-    AlternativeCycle([
-        DividedCycle([
+    [
+        Cycle([
             Notes(["a"]), 
             Notes(["b"]),
             Notes(["c"])
         ]),
-        DividedCycle([
+        Cycle([
             Notes(["a"]),
             Notes(["b"]),
-            DividedCycle([
+            Cycle([
                 Notes(["c"]), 
                 Notes(["d"])
             ])
         ])
-    ]),
-    parse("[ a b c ] [a b [c d]]")
+    ],
+    parse(preprocess("[ a b c ] [a b [c d]]"))
 )
+
 test(
     "crazy whitespace",
-    AlternativeCycle([
-        DividedCycle([
+    [
+        Cycle([
             Notes(["a"]),
             Notes(["b"]),
             Notes(["c"]),
         ])
-    ]),
-    parse(""" [ a       b c
-          ] """)
+    ],
+    parse(preprocess(""" [ a       b c
+          ] """))
 )
 
 test(
     "polyphony",
-    AlternativeCycle([
-        DividedCycle([
+    [
+        Cycle([
             Notes(["a"]),
             Notes(["b", "c", "d"]),
             Notes(["c", "e"]),
         ])
-    ]),
-    parse("[a b,c,d c,e]")
+    ],
+    parse(preprocess("[a b,c,d c,e]"))
 )
 
-test_raises("test open without close", parse, "a b c]")
+test_raises("test open without close", parse, "[a b c")
 test_raises("close without open", parse, "a b c]")
-test_raises("mixed bracket types", parse, "[a b c>")
+test_raises("top level without brackets", parse, "a b c")
 
 test(
     "preprocess simple AC",
@@ -207,3 +209,36 @@ test(
     "[a b c] [a b d] [a b c] [a b e]",
     preprocess("[a b <c <d e>>]")
 )
+
+test(
+    "simple generation",
+    [
+        (['a'], Fraction(0, 1), Fraction(1, 3)),
+        (['b'], Fraction(1, 3), Fraction(2, 3)),
+        (['c'], Fraction(2, 3), Fraction(1, 1))
+    ],
+    generate_nodes(parse(preprocess("[a b c]")))
+)
+
+test(
+    "nested generation",
+    [
+        (['a'], Fraction(0, 1), Fraction(1, 4)),
+        (['b'], Fraction(1, 4), Fraction(1, 2)),
+        (['c'], Fraction(1, 2), Fraction(1, 1))
+    ],
+    generate_nodes(parse(preprocess("[[a b] c]")))
+)
+
+
+test(
+    "simple alternatives",
+    [
+        (['a'], Fraction(0, 1), Fraction(1, 1)),
+        (['b'], Fraction(1, 1), Fraction(2, 1)),
+        (['c'], Fraction(2, 1), Fraction(3, 1))
+    ],
+    generate_nodes(parse(preprocess("<[a] [b] [c]>")))
+)
+
+# TODO: figure out what the "rules" are for these and confirm they are validated/enforced
