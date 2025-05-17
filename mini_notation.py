@@ -1,29 +1,10 @@
+from collections import namedtuple
 from fractions import Fraction
 
-class Cycle():
-    def __init__(self, children=None):
-        self.children = children or []
+Cycle = namedtuple('Cycle', ['children'])
+Event = namedtuple('Event', ['value', 'start', 'end'], defaults=[-1, -1])
 
-    def __eq__(self, other):
-        return self.children == other.children
-
-    def __repr__(self):
-        return "Cycle: " + repr(self.children)
-
-class Notes():
-    def __init__(self, notes=None):
-        self.notes = notes or []
-
-    def __eq__(self, other):
-        if not isinstance(other, Notes):
-            return False
-        return self.notes == other.notes
-
-    def __repr__(self):
-        return "Notes: "+repr(self.notes)
-
-
-def preprocess(s):
+def expand_alternatives(s):
     """
     Recursively expands out all alternative cycles by making copies of the whole string
     starting with the most deeply nested alternative cycles.
@@ -44,20 +25,21 @@ def preprocess(s):
         alternative_cycle = s[start:end]
         cycle_elements = alternative_cycle.strip("<>").split(" ")
         copies = [
-            preprocess(f"{s[:start]}{element}{s[end:]}") for element in cycle_elements
+            expand_alternatives(f"{s[:start]}{element}{s[end:]}") for element in cycle_elements
         ]
         return " ".join(copies)
     else:
         return s
 
-def parse(s):
+def parse_mini(s):
     cycles = []
     stack = []
     literal = ""
 
-    for c in s:
+    expanded = expand_alternatives(s)
+    for c in expanded:
         if c == "[":
-            cycle = Cycle()
+            cycle = Cycle([])
 
             if len(stack) > 0:
                 stack[-1].children.append(cycle)
@@ -65,7 +47,7 @@ def parse(s):
             stack.append(cycle)
         elif c in {" ", "\n", "\t", "]"}:
             if literal:
-                notes = Notes(literal.split(","))
+                notes = [Event(value=s) for s in literal.split(",")]
                 stack[-1].children.append(notes)
                 literal = ""
 
@@ -82,36 +64,64 @@ def parse(s):
 
     return cycles
 
-# TODO: fix name: not really generating nodes, generating events
-def generate_nodes(nodes):
-    events = []
-    for (i, node) in enumerate(nodes):
-        events += generate_node(node, Fraction(i), Fraction(i+1))
+def merge_voice_lists(a, b):
+    """
+    Merge a and b which are both 2d list of events per voice.
 
-    return events
+    Returns a new list rather than mutating a or b.
+    """
+    merged = [ [] for i in range(max(len(a), len(b))) ]
 
-def generate_node(node, start, end):
-    if isinstance(node, Notes):
-        return (node.notes, start, end)
+    for (i, merged_voice) in enumerate(merged):
+        if i < len(a):
+            merged_voice += a[i]
+        if i < len(b):
+            merged_voice += b[i]
+
+    return merged
+
+def generate_events(cycles):
+    """
+    Generate events per voice for a list of cycles.
+    """
+    voices = []
+    for (i, cycle) in enumerate(cycles):
+        voices = merge_voice_lists(
+            voices,
+            generate_node_events(cycle, Fraction(i), Fraction(i+1))
+        )
+
+    return voices
+
+def generate_node_events(node, start, end):
+    """
+    Generate events for a single node in the parse tree.
+    """
+
+    if isinstance(node, list):
+        # assumes all lists contain Events
+        # returns a 2D list because each simultaneous event gets its own voice
+        return [[Event(value=e.value, start=start, end=end)] for e in node]
     elif isinstance(node, Cycle):
         time_increment = (end - start) / len(node.children)
-        notes = []
+        voices = []
         for (i, child) in enumerate(node.children):
-            generated = generate_node(
-                child,
-                start + (time_increment * i),
-                start + (time_increment * (i + 1))
+            voices = merge_voice_lists(
+                voices,
+                generate_node_events(
+                    child,
+                    start + (time_increment * i),
+                    start + (time_increment * (i + 1))
+                )
             )
-            if isinstance(generated, list):
-                notes += generated
-            elif isinstance(generated, tuple):
-                notes.append(generated)
-            else:
-                raise Exception(f"generate_node() returned value: {generated}")
 
-        return notes
+        return voices
     else:
         raise Exception(f"unexpected node: {node}")
+
+def split_events_by_voice(events):
+    # never mind, let's do this in generate_events
+    pass
 
 def test(name, expected, actual):
     if expected == actual:
@@ -129,116 +139,150 @@ def test_raises(name, func, param):
 
 test(
     "one level, one cycle",
-    [Cycle([ Notes(["a"]), Notes(["b"]), Notes(["c"]), ])],
-    parse(preprocess("[a b c]"))
+    [
+        Cycle([ 
+               [Event("a")], 
+               [Event("b")], 
+               [Event("c")], 
+        ])
+    ],
+    parse_mini("[a b c]")
 )
 
 test(
     "one level, three cycles",
     [
-        Cycle([Notes(["a"])]),
-        Cycle([Notes(["b"])]),
-        Cycle([Notes(["c"])]),
+        Cycle([[Event("a")]]),
+        Cycle([[Event("b")]]),
+        Cycle([[Event("c")]]),
     ],
-    parse(preprocess("<[a] [b] [c]>"))
+    parse_mini("<[a] [b] [c]>")
 )
 
 test(
     "three level nesting",
     [
         Cycle([
-            Notes(["a"]), 
-            Notes(["b"]),
-            Notes(["c"])
+            [Event("a")], 
+            [Event("b")], 
+            [Event("c")], 
         ]),
         Cycle([
-            Notes(["a"]),
-            Notes(["b"]),
+            [Event("a")], 
+            [Event("b")], 
             Cycle([
-                Notes(["c"]), 
-                Notes(["d"])
+                [Event("c")], 
+                [Event("d")], 
             ])
         ])
     ],
-    parse(preprocess("[ a b c ] [a b [c d]]"))
+    parse_mini("[ a b c ] [a b [c d]]")
 )
 
 test(
     "crazy whitespace",
     [
         Cycle([
-            Notes(["a"]),
-            Notes(["b"]),
-            Notes(["c"]),
+            [Event("a")], 
+            [Event("b")], 
+            [Event("c")], 
         ])
     ],
-    parse(preprocess(""" [ a       b c
-          ] """))
+    parse_mini(""" [ a       b c
+          ] """)
 )
 
 test(
     "polyphony",
     [
         Cycle([
-            Notes(["a"]),
-            Notes(["b", "c", "d"]),
-            Notes(["c", "e"]),
+            [Event("a")],
+            [Event("b"), Event("c"), Event("d")],
+            [Event("c"), Event("e")],
         ])
     ],
-    parse(preprocess("[a b,c,d c,e]"))
+    parse_mini("[a b,c,d c,e]")
 )
 
-test_raises("test open without close", parse, "[a b c")
-test_raises("close without open", parse, "a b c]")
-test_raises("top level without brackets", parse, "a b c")
+test_raises("test open without close", parse_mini, "[a b c")
+test_raises("close without open", parse_mini, "a b c]")
+test_raises("top level without brackets", parse_mini, "a b c")
 
 test(
-    "preprocess simple AC",
+    "expand simple AC",
     "[a b c] [a b d]",
-    preprocess("[a b <c d>]")
+    expand_alternatives("[a b <c d>]")
 )
 
 test(
-    "preprocess non-nested ACs",
+    "expand non-nested ACs",
     "[a b c [e f]] [a b c [e g]] [a b d [e f]] [a b d [e g]]",
-    preprocess("[a b <c d> [e <f g>]]")
+    expand_alternatives("[a b <c d> [e <f g>]]")
 )
 
 test(
-    "preprocess nested ACs",
+    "expand nested ACs",
     "[a b c] [a b d] [a b c] [a b e]",
-    preprocess("[a b <c <d e>>]")
+    expand_alternatives("[a b <c <d e>>]")
 )
 
 test(
     "simple generation",
     [
-        (['a'], Fraction(0, 1), Fraction(1, 3)),
-        (['b'], Fraction(1, 3), Fraction(2, 3)),
-        (['c'], Fraction(2, 3), Fraction(1, 1))
+        [
+            Event('a', Fraction(0, 1), Fraction(1, 3)),
+            Event('b', Fraction(1, 3), Fraction(2, 3)),
+            Event('c', Fraction(2, 3), Fraction(1, 1))
+        ]
     ],
-    generate_nodes(parse(preprocess("[a b c]")))
+    generate_events(parse_mini("[a b c]"))
 )
 
 test(
     "nested generation",
     [
-        (['a'], Fraction(0, 1), Fraction(1, 4)),
-        (['b'], Fraction(1, 4), Fraction(1, 2)),
-        (['c'], Fraction(1, 2), Fraction(1, 1))
+        [
+            Event('a', Fraction(0, 1), Fraction(1, 4)),
+            Event('b', Fraction(1, 4), Fraction(1, 2)),
+            Event('c', Fraction(1, 2), Fraction(1, 1))
+        ]
     ],
-    generate_nodes(parse(preprocess("[[a b] c]")))
+    generate_events(parse_mini("[[a b] c]"))
 )
 
 
 test(
     "simple alternatives",
     [
-        (['a'], Fraction(0, 1), Fraction(1, 1)),
-        (['b'], Fraction(1, 1), Fraction(2, 1)),
-        (['c'], Fraction(2, 1), Fraction(3, 1))
+        [
+            Event('a', Fraction(0, 1), Fraction(1, 1)),
+            Event('b', Fraction(1, 1), Fraction(2, 1)),
+            Event('c', Fraction(2, 1), Fraction(3, 1))
+        ]
     ],
-    generate_nodes(parse(preprocess("<[a] [b] [c]>")))
+    generate_events(parse_mini("<[a] [b] [c]>"))
 )
 
-# TODO: figure out what the "rules" are for these and confirm they are validated/enforced
+test(
+    "polyphony generation",
+    [
+        [
+            Event("a", Fraction(0, 1), Fraction(1, 3)),
+            Event("b", Fraction(1, 3), Fraction(2, 3)),
+            Event("d", Fraction(2,3), Fraction(1, 1)),
+        ],
+        [
+            Event("c", Fraction(1, 3), Fraction(2, 3)),
+            Event("e", Fraction(2,3), Fraction(1, 1)),
+        ],
+        [
+            Event("d", Fraction(1, 3), Fraction(2, 3)),
+        ],
+    ],
+    generate_events(parse_mini("[a b,c,d d,e]"))
+)
+
+test_raises("test open without close", parse_mini, "[a b c")
+test_raises("close without open", parse_mini, "a b c]")
+test_raises("top level without brackets", parse_mini, "a b c")
+

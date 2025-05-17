@@ -5,6 +5,9 @@ import time
 
 from mido import MidiFile, MidiTrack, Message, MetaMessage, open_output, Backend, bpm2tempo
 
+# TODO: avoid executing tests on import...
+from mini_notation import parse_mini, generate_events
+
 ASCII_NOTE_RE = re.compile('(\D*)(\d+)(\+*)(\-*)')
 WS_RE = re.compile(' +')
 
@@ -16,7 +19,7 @@ CONFIG_FIELD_DEFAULTS = {
     "midi_devices": ["FH-2"], # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
     "midi_file_name": "new_song.mid",
     "loops": 1,
-    # "beats_per_measure": 4, # haven't found a reason we need this yet
+    "beats_per_measure": 4,
 }
 Config = namedtuple(
     'Config', 
@@ -65,8 +68,19 @@ midi_note_numbers = {
   'B': 23, 
 }
 
-def get_midi_note(note, octave):
-    return midi_note_numbers[note] + (int(octave) * 12)
+def get_midi_note_and_velocity(symbol):
+    m = ASCII_NOTE_RE.search(symbol)
+    note_name, octave, up_volume, down_volume = m.groups()
+    if note_name:
+        midi_note = midi_note_numbers[note_name] + (int(octave) * 12)
+    else:
+        # when the symbol is missing, treat the octave as a MIDI note number (0-127) instead
+        midi_note = int(octave)
+    velocity = 60 
+    velocity += 20 * len(up_volume) 
+    velocity -= 20 * len(down_volume) 
+
+    return midi_note, velocity
 
 rest_length = 0
 def process_symbol(track, channel, symbol, symbol_start, symbol_end):
@@ -77,16 +91,7 @@ def process_symbol(track, channel, symbol, symbol_start, symbol_end):
         if symbol in ('===', '=='):
             track[-1].time += symbol_start + symbol_end
         else: 
-            m = ASCII_NOTE_RE.search(symbol)
-            symbol, octave, up_volume, down_volume = m.groups()
-            if symbol:
-                midi_note = get_midi_note(symbol, octave)
-            else:
-                # when the symbol is missing, treat the octave as a MIDI note number (0-127) instead
-                midi_note = int(octave)
-            velocity = 60 
-            velocity += 20 * len(up_volume) 
-            velocity -= 20 * len(down_volume) 
+            midi_note, velocity = get_midi_note_and_velocity(symbol)
 
             track.append(
                 Message(
@@ -110,6 +115,64 @@ def process_symbol(track, channel, symbol, symbol_start, symbol_end):
             )
 
         rest_length = 0
+
+def mini_to_midi(mini_notation, config):
+    """
+    Converts mini notation string to MIDI.
+
+    Future design: takes multiple "layers" where each layer has a pattern
+    and corresponds to a parameter (pitch, velocity, midi "MOD", 
+    midi "aftertouch" "portamento" etc.).  The order of the 
+    patterns determines which pattern takes precedent.  
+
+    TODO
+    - handle rests
+    - handle swing
+    - handle layers
+    """
+    mid = MidiFile()
+    channel = 0
+
+    cycles = parse_mini(mini_notation)
+    events_by_voice = generate_events(cycles)
+    ticks_per_cycle = mid.ticks_per_beat * config.beats_per_measure
+
+    for voice_events in events_by_voice:
+        track = MidiTrack()
+        track.append(MetaMessage('set_tempo', tempo=bpm2tempo(config.beats_per_minute)))
+
+        prev_duration = int(voice_events[0].start * ticks_per_cycle)
+        for event in voice_events:
+            midi_note, velocity = get_midi_note_and_velocity(event.value)
+            duration = int((event.end - event.start) * config.note_width * ticks_per_cycle)
+            track.append(
+                Message(
+                    'note_on',
+                    channel=channel,
+                    note=midi_note,
+                    velocity=velocity,
+                    # delta from preceding note_off (or start of song)
+                    time=0 if prev_duration is None else prev_duration
+                )
+            )
+            track.append(
+                Message(
+                    'note_off',
+                    channel=channel,
+                    note=midi_note,
+                    velocity=velocity,
+                    # delta from preceding note_on
+                    time=duration
+                )
+            )
+            prev_duration = duration
+
+        mid.tracks.append(track)
+        channel += 1
+
+    mid.save(config.midi_file_name)
+
+    return mid
 
 def ascii_to_midi(asciis, config):
     "Assumes asciis is a list of strings and each has same number of newlines"""
@@ -202,9 +265,15 @@ def multi_port_play(midi_ports, config):
             midi_port.reset()
         sys.exit(1)
 
-def play(asciis, config):
-    ascii_to_midi(asciis, config)
+def play_mini(mini_notation, config):
+    mini_to_midi(mini_notation, config)
+    play_midi(config)
 
+def play_ascii(asciis, config):
+    ascii_to_midi(asciis, config)
+    play_midi(config)
+
+def play_midi(config):
     # user may pass None 
     if not config.midi_devices:
         return 
