@@ -5,7 +5,6 @@ import time
 
 from mido import MidiFile, MidiTrack, Message, MetaMessage, open_output, Backend, bpm2tempo
 
-# TODO: avoid executing tests on import...
 from mini_notation import parse_mini, generate_events
 
 ASCII_NOTE_RE = re.compile('(\D*)(\d+)(\+*)(\-*)')
@@ -126,6 +125,8 @@ def mini_to_midi(mini_notation, config):
     patterns determines which pattern takes precedent.  
 
     TODO
+    - loop smoothly
+    - live update
     - handle rests
     - handle swing
     - handle layers
