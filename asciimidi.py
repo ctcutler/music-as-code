@@ -3,7 +3,7 @@ import re
 import sys
 import time
 
-from mido import MidiFile, MidiTrack, Message, MetaMessage, open_output, Backend, bpm2tempo
+from mido import MidiFile, MidiTrack, Message, MetaMessage, open_output, Backend, bpm2tempo, tick2second
 
 from mini_notation import parse_mini, generate_events
 
@@ -17,7 +17,6 @@ CONFIG_FIELD_DEFAULTS = {
     "swing": .5,               
     "midi_devices": ["FH-2"], # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
     "midi_file_name": "new_song.mid",
-    "loops": 1,
     "beats_per_measure": 4,
 }
 Config = namedtuple(
@@ -125,11 +124,11 @@ def mini_to_midi(mini_notation, config):
     patterns determines which pattern takes precedent.  
 
     TODO
-    - loop smoothly
     - live update
     - handle rests
     - handle swing
     - handle layers
+    - stack rhythm patterns (e.g. one voice holds a note while another plays two)
     """
     mid = MidiFile()
     channel = 0
@@ -137,10 +136,11 @@ def mini_to_midi(mini_notation, config):
     cycles = parse_mini(mini_notation)
     events_by_voice = generate_events(cycles)
     ticks_per_cycle = mid.ticks_per_beat * config.beats_per_measure
+    tempo = bpm2tempo(config.beats_per_minute)
 
     for voice_events in events_by_voice:
         track = MidiTrack()
-        track.append(MetaMessage('set_tempo', tempo=bpm2tempo(config.beats_per_minute)))
+        track.append(MetaMessage('set_tempo', tempo=tempo))
 
         prev_duration = int(voice_events[0].start * ticks_per_cycle)
         for event in voice_events:
@@ -173,7 +173,7 @@ def mini_to_midi(mini_notation, config):
 
     mid.save(config.midi_file_name)
 
-    return mid
+    return tick2second(len(cycles) * ticks_per_cycle, mid.ticks_per_beat, tempo)
 
 def ascii_to_midi(asciis, config):
     "Assumes asciis is a list of strings and each has same number of newlines"""
@@ -181,6 +181,7 @@ def ascii_to_midi(asciis, config):
     channel = 0
     ticks_per_symbol = mid.ticks_per_beat // config.symbols_per_beat
     ticks_per_pair = 2 * ticks_per_symbol
+    tempo = bpm2tempo(config.beats_per_minute)
     global rest_length
 
     # if single str, wrap in list
@@ -198,11 +199,13 @@ def ascii_to_midi(asciis, config):
     right_start = int(left_swing - left_end)
 
     # reversed() so that the "bottom" voice is channel 0
+    max_symbol_count = 0
     for voice in reversed(music.strip().split('\n')):
         track = MidiTrack()
-        track.append(MetaMessage('set_tempo', tempo=bpm2tempo(config.beats_per_minute)))
+        track.append(MetaMessage('set_tempo', tempo=tempo))
         symbols = WS_RE.split(voice.strip())
-        symbol_pairs = zip(symbols[0::2], symbols[1::2])
+        symbol_pairs = list(zip(symbols[0::2], symbols[1::2]))
+        max_symbol_count = max(max_symbol_count, len(symbol_pairs) * 2)
 
         is_first_pair = True
         for (left, right) in symbol_pairs:
@@ -216,7 +219,7 @@ def ascii_to_midi(asciis, config):
 
     mid.save(config.midi_file_name)
 
-    return mid
+    return tick2second(max_symbol_count * ticks_per_symbol, mid.ticks_per_beat, tempo)
 
 def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
     """
@@ -242,24 +245,32 @@ def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
             next_clock += seconds_per_pulse
         all_messages.append(message)
 
-    all_messages.append(Message('stop', time=all_messages[-1].time))
+    #all_messages.append(Message('stop', time=all_messages[-1].time))
     return all_messages
 
-def multi_port_play(midi_ports, config):
+def multi_port_play(midi_ports, config, total_secs):
     midi_file = MidiFile(config.midi_file_name)
     messages = add_clock_messages(list(midi_file), config.beats_per_minute, 24)
     start_time = time.time()
+    first_loop = True
     try:
-        for message in messages:
-            # after add_clock_messages, every message.time is a 0-based offset from
-            # the start of the song, in seconds
-            sleep_duration = (message.time + start_time) - time.time()
-            if sleep_duration > 0.0:
-                time.sleep(sleep_duration)
-            if isinstance(message, MetaMessage):
-                continue
-            for midi_port in midi_ports:
-                midi_port.send(message)
+        while True:
+            for message in messages:
+                # after add_clock_messages, every message.time is a 0-based offset from
+                # the start of the song, in seconds... we need to adjust on every successive
+                # loop
+                if not first_loop:
+                    message.time += total_secs
+
+                sleep_duration = (message.time + start_time) - time.time()
+
+                if sleep_duration > 0.0:
+                    time.sleep(sleep_duration)
+
+                if not isinstance(message, MetaMessage):
+                    for midi_port in midi_ports:
+                        midi_port.send(message)
+            first_loop = False
     except KeyboardInterrupt:
         for midi_port in midi_ports:
             midi_port.send(Message('stop', time=time.time()))
@@ -267,29 +278,28 @@ def multi_port_play(midi_ports, config):
         sys.exit(1)
 
 def play_mini(mini_notation, config):
-    mini_to_midi(mini_notation, config)
-    play_midi(config)
+    total_secs = mini_to_midi(mini_notation, config)
+    play_midi(config, total_secs)
 
 def play_ascii(asciis, config):
-    ascii_to_midi(asciis, config)
-    play_midi(config)
+    total_secs = ascii_to_midi(asciis, config)
+    play_midi(config, total_secs)
 
-def play_midi(config):
+def play_midi(config, total_secs):
     # user may pass None 
     if not config.midi_devices:
         return 
 
     backend = Backend()
-    for i in range(config.loops):
-        assert(len(config.midi_devices) < 3)
+    assert(len(config.midi_devices) < 3)
 
-        if len(config.midi_devices) == 2:
-            with (
-                backend.open_output(config.midi_devices[0]) as midi_port1,
-                backend.open_output(config.midi_devices[1]) as midi_port2
-            ):
-                multi_port_play([midi_port1, midi_port2], config)
-        else: 
-            with backend.open_output(config.midi_devices[0]) as midi_port:
-                multi_port_play([midi_port], config)
+    if len(config.midi_devices) == 2:
+        with (
+            backend.open_output(config.midi_devices[0]) as midi_port1,
+            backend.open_output(config.midi_devices[1]) as midi_port2
+        ):
+            multi_port_play([midi_port1, midi_port2], config, total_secs)
+    else: 
+        with backend.open_output(config.midi_devices[0]) as midi_port:
+            multi_port_play([midi_port], config, total_secs)
 
