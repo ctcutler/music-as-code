@@ -124,11 +124,10 @@ def mini_to_midi(mini_notation, config):
     patterns determines which pattern takes precedent.  
 
     TODO
-    - handle rests
     - stack rhythm patterns (e.g. one voice holds a note while another plays two)
     - live update
-    - handle swing
     - handle layers
+    - handle swing
     """
     mid = MidiFile()
     channel = 0
@@ -147,31 +146,36 @@ def mini_to_midi(mini_notation, config):
         # number of cycles but the Message.time values are relative to
         # time of the previous message
 
-        last_note_end = 0 # contains _absolute_ time of late note's note_off
+        prev_note_end = 0 # contains _absolute_ time of late note's note_off
         for event in voice_events:
-            midi_note, velocity = get_midi_note_and_velocity(event.value)
-            track.append(
-                Message(
-                    'note_on',
-                    channel=channel,
-                    note=midi_note,
-                    velocity=velocity,
-                    # delta from preceding note_off (or start of song)
-                    time=round((event.start - last_note_end) * ticks_per_cycle)
+            # default to 0 because rests notes that are "on" for 0 time
+            note_duration = 0
+
+            if event.value != "~": # don't append Messages for rests
+                note_duration = (event.end - event.start) * config.note_width
+                midi_note, velocity = get_midi_note_and_velocity(event.value)
+                track.append(
+                    Message(
+                        'note_on',
+                        channel=channel,
+                        note=midi_note,
+                        velocity=velocity,
+                        # delta from preceding note_off (or start of song)
+                        time=round((event.start - prev_note_end) * ticks_per_cycle)
+                    )
                 )
-            )
-            note_off_delta = (event.end - event.start) * config.note_width
-            track.append(
-                Message(
-                    'note_off',
-                    channel=channel,
-                    note=midi_note,
-                    velocity=velocity,
-                    # delta from preceding note_on
-                    time=round(note_off_delta * ticks_per_cycle)
+                track.append(
+                    Message(
+                        'note_off',
+                        channel=channel,
+                        note=midi_note,
+                        velocity=velocity,
+                        # delta from preceding note_on
+                        time=round(note_duration * ticks_per_cycle)
+                    )
                 )
-            )
-            last_note_end = event.start + note_off_delta
+
+            prev_note_end = event.start + note_duration
 
         mid.tracks.append(track)
         channel += 1

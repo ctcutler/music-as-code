@@ -197,7 +197,7 @@ expected = [
     Message('note_off', time=3.0),
 ]
 if actual == expected:
-    print("PASSSED: clock messages")
+    print("PASSED: clock messages")
 else:
     e = [(mesg.type, mesg.time) for mesg in expected]
     a = [(mesg.type, mesg.time) for mesg in actual]
@@ -269,3 +269,10 @@ expected = [[
     on("C3", 480), off("C3", 160), 
 ]]
 test_mini_to_midi("mini: 25% note width", expected, "[A3 B3 C3]", note_width=.25)
+
+expected = [[
+    on("A3", 384), off("A3", 192), 
+    on("B3", 192), off("B3", 192), 
+    on("C3", 384), off("C3", 192), 
+]]
+test_mini_to_midi("mini: rests", expected, "[~ A3 B3 ~ C3]")
