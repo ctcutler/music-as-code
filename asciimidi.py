@@ -124,11 +124,11 @@ def mini_to_midi(mini_notation, config):
     patterns determines which pattern takes precedent.  
 
     TODO
-    - live update
     - handle rests
+    - stack rhythm patterns (e.g. one voice holds a note while another plays two)
+    - live update
     - handle swing
     - handle layers
-    - stack rhythm patterns (e.g. one voice holds a note while another plays two)
     """
     mid = MidiFile()
     channel = 0
@@ -142,10 +142,14 @@ def mini_to_midi(mini_notation, config):
         track = MidiTrack()
         track.append(MetaMessage('set_tempo', tempo=tempo))
 
-        prev_duration = int(voice_events[0].start * ticks_per_cycle)
+        # it's important to remember here that event.start and event.end are 
+        # absolute values from the beginning of the track, measured in
+        # number of cycles but the Message.time values are relative to
+        # time of the previous message
+
+        last_note_end = 0 # contains _absolute_ time of late note's note_off
         for event in voice_events:
             midi_note, velocity = get_midi_note_and_velocity(event.value)
-            duration = int((event.end - event.start) * config.note_width * ticks_per_cycle)
             track.append(
                 Message(
                     'note_on',
@@ -153,9 +157,10 @@ def mini_to_midi(mini_notation, config):
                     note=midi_note,
                     velocity=velocity,
                     # delta from preceding note_off (or start of song)
-                    time=0 if prev_duration is None else prev_duration
+                    time=round((event.start - last_note_end) * ticks_per_cycle)
                 )
             )
+            note_off_delta = (event.end - event.start) * config.note_width
             track.append(
                 Message(
                     'note_off',
@@ -163,17 +168,17 @@ def mini_to_midi(mini_notation, config):
                     note=midi_note,
                     velocity=velocity,
                     # delta from preceding note_on
-                    time=duration
+                    time=round(note_off_delta * ticks_per_cycle)
                 )
             )
-            prev_duration = duration
+            last_note_end = event.start + note_off_delta
 
         mid.tracks.append(track)
         channel += 1
 
     mid.save(config.midi_file_name)
 
-    return tick2second(len(cycles) * ticks_per_cycle, mid.ticks_per_beat, tempo)
+    return (mid, tick2second(len(cycles) * ticks_per_cycle, mid.ticks_per_beat, tempo))
 
 def ascii_to_midi(asciis, config):
     "Assumes asciis is a list of strings and each has same number of newlines"""
@@ -219,7 +224,7 @@ def ascii_to_midi(asciis, config):
 
     mid.save(config.midi_file_name)
 
-    return tick2second(max_symbol_count * ticks_per_symbol, mid.ticks_per_beat, tempo)
+    return (mid, tick2second(max_symbol_count * ticks_per_symbol, mid.ticks_per_beat, tempo))
 
 def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
     """
@@ -278,11 +283,11 @@ def multi_port_play(midi_ports, config, total_secs):
         sys.exit(1)
 
 def play_mini(mini_notation, config):
-    total_secs = mini_to_midi(mini_notation, config)
+    (ignore, total_secs) = mini_to_midi(mini_notation, config)
     play_midi(config, total_secs)
 
 def play_ascii(asciis, config):
-    total_secs = ascii_to_midi(asciis, config)
+    (ignore, total_secs) = ascii_to_midi(asciis, config)
     play_midi(config, total_secs)
 
 def play_midi(config, total_secs):

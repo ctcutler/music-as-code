@@ -39,22 +39,23 @@ def test_ascii_to_midi(name, expected, notes, note_width, swing):
         beats_per_minute=90,
         midi_file_name='tester.mid'
     )
-    mid = ascii_to_midi([notes], config)
+    (mid, ignore) = ascii_to_midi([notes], config)
     # assume only one track/voice
     actual = [mesg for mesg in mid.tracks[0] if not mesg.is_meta]
     if expected == actual:
-        print(f"{name} PASSED")
+        print(f"PASSED: {name}")
     else:
         e = [(mesg.note, mesg.time) for mesg in expected]
         a = [(mesg.note, mesg.time) for mesg in actual]
-        print(f"{name} FAILED\n{e}\n{a}")
+        print(f"FAILED: {name}\n{e}\n{a}")
 
-def test_mini_to_midi(name, expected, mini):
+def test_mini_to_midi(name, expected, mini, note_width=.5):
     config = Config(
         beats_per_minute=90,
+        note_width=note_width,
         midi_file_name='tester.mid'
     )
-    mid = mini_to_midi(mini, config)
+    (mid, ignore) = mini_to_midi(mini, config)
 
     actual = []
     for track in mid.tracks:
@@ -66,10 +67,9 @@ def test_mini_to_midi(name, expected, mini):
         actual.append(track_messages)
 
     if expected == actual:
-        print(f"{name} PASSED")
+        print(f"PASSED: {name}")
     else:
         e = []
-        print(expected)
         for track in expected:
             track_messages = []
             for mesg in track:
@@ -77,7 +77,6 @@ def test_mini_to_midi(name, expected, mini):
                     track_messages.append((mesg.note, mesg.time))
             e.append(track_messages)
         a = []
-        print(actual)
         for track in actual:
             track_messages = []
             for mesg in track:
@@ -85,7 +84,7 @@ def test_mini_to_midi(name, expected, mini):
                     track_messages.append((mesg.note, mesg.time))
             a.append(track_messages)
 
-        print(f"{name} FAILED\n{e}\n{a}")
+        print(f"FAILED: {name}\n{e}\n{a}")
 
 notes = "A3 B3 C3 D3"
 expected = [
@@ -178,32 +177,31 @@ note_messages = [
 ]
 actual = add_clock_messages(note_messages, 60, 4)
 expected = [
-    Message('start', time=0),
-    Message('clock', time=0),
-    Message('note_on', time=0),
+    Message('start', time=0.0),
+    Message('clock', time=0.0),
+    Message('note_on', time=0.0),
     Message('clock', time=.25),
     Message('clock', time=.5),
     Message('clock', time=.75),
-    Message('clock', time=1),
-    Message('note_off', time=1),
+    Message('clock', time=1.0),
+    Message('note_off', time=1.0),
     Message('clock', time=1.25),
     Message('clock', time=1.5),
     Message('clock', time=1.75),
-    Message('clock', time=2),
-    Message('note_on', time=2),
+    Message('clock', time=2.0),
+    Message('note_on', time=2.0),
     Message('clock', time=2.25),
     Message('clock', time=2.5),
     Message('clock', time=2.75),
-    Message('clock', time=3),
+    Message('clock', time=3.0),
     Message('note_off', time=3.0),
-    Message('stop', time=3.0),
 ]
 if actual == expected:
-    print("clock messages PASSED")
+    print("PASSSED: clock messages")
 else:
     e = [(mesg.type, mesg.time) for mesg in expected]
     a = [(mesg.type, mesg.time) for mesg in actual]
-    print(f"clock messages FAILED\n{e}\n{a}")
+    print(f"FAILED: clock messages\n{e}\n{a}")
 
 
 notes = "10 === --- 100"
@@ -264,3 +262,10 @@ expected = [
     ],
 ]
 test_mini_to_midi("mini: polyphony", expected, "[A3 B3,C3,D3 C3,E3]")
+
+expected = [[
+    on("A3", 0), off("A3", 160), 
+    on("B3", 480), off("B3", 160), 
+    on("C3", 480), off("C3", 160), 
+]]
+test_mini_to_midi("mini: 25% note width", expected, "[A3 B3 C3]", note_width=.25)
