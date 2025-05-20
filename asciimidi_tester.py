@@ -273,6 +273,21 @@ test_mini_to_midi("mini: 25% note width", expected, "[A3 B3 C3]", note_width=.25
 expected = [[
     on("A3", 384), off("A3", 192), 
     on("B3", 192), off("B3", 192), 
-    on("C3", 384), off("C3", 192), 
+    on("C3", 192+384), off("C3", 192), 
 ]]
 test_mini_to_midi("mini: rests", expected, "[~ A3 B3 ~ C3]")
+
+
+expected = [
+    [
+        on("E4", 0, 0), off("E4", 240, 0), 
+        on("E4", 240+480, 0), off("E4", 240, 0), 
+        on("E4", 240, 0), off("E4", 240, 0), 
+    ],
+    [
+        on("G4", 0, 1), off("G4", 240, 1), 
+        on("G4", 240+480, 1), off("G4", 240, 1), 
+        on("G4", 240, 1), off("G4", 240, 1), 
+    ],
+]
+test_mini_to_midi("mini: polyphonic rests", expected, "[ E4,G4 ~ E4,G4 E4,G4 ]")

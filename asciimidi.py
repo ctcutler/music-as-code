@@ -146,12 +146,11 @@ def mini_to_midi(mini_notation, config):
         # number of cycles but the Message.time values are relative to
         # time of the previous message
 
-        prev_note_end = 0 # contains _absolute_ time of late note's note_off
+        prev_note_end = 0 # contains _absolute_ time of prev note's note_off
         for event in voice_events:
-            # default to 0 because rests notes that are "on" for 0 time
-            note_duration = 0
 
-            if event.value != "~": # don't append Messages for rests
+            # don't update prev_note_end or append Messages for rest events
+            if event.value != "~":
                 note_duration = (event.end - event.start) * config.note_width
                 midi_note, velocity = get_midi_note_and_velocity(event.value)
                 track.append(
@@ -174,8 +173,7 @@ def mini_to_midi(mini_notation, config):
                         time=round(note_duration * ticks_per_cycle)
                     )
                 )
-
-            prev_note_end = event.start + note_duration
+                prev_note_end = event.start + note_duration
 
         mid.tracks.append(track)
         channel += 1
