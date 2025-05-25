@@ -1,6 +1,10 @@
 from collections import namedtuple
 from fractions import Fraction
 
+from mido import MidiFile, bpm2tempo, tick2second, MidiTrack, Message, MetaMessage
+
+from midi import get_midi_note_and_velocity, play_midi
+
 Cycle = namedtuple('Cycle', ['children'])
 Event = namedtuple('Event', ['value', 'start', 'end'], defaults=[-1, -1])
 
@@ -119,3 +123,80 @@ def generate_node_events(node, start, end):
     else:
         raise Exception(f"unexpected node: {node}")
 
+
+def mini_to_midi(mini_notations, config):
+    """
+    Converts mini notation string to MIDI.
+
+    Future design: takes multiple "layers" where each layer has a pattern
+    and corresponds to a parameter (pitch, velocity, midi "MOD", 
+    midi "aftertouch" "portamento" etc.).  The order of the 
+    patterns determines which pattern takes precedent.  
+
+    TODO
+    - stack rhythm patterns (e.g. one voice holds a note while another plays two)
+    - live update
+    - handle layers
+    - handle swing
+    """
+    if isinstance(mini_notations, str):
+        mini_notations = [mini_notations]
+
+    mid = MidiFile()
+    channel = 0
+
+    ticks_per_cycle = mid.ticks_per_beat * config.beats_per_measure
+    tempo = bpm2tempo(config.beats_per_minute)
+
+    for mini in mini_notations:
+        cycles = parse_mini(mini)
+        events_by_voice = generate_events(cycles)
+
+        for voice_events in events_by_voice:
+            track = MidiTrack()
+            track.append(MetaMessage('set_tempo', tempo=tempo))
+
+            # it's important to remember here that event.start and event.end are 
+            # absolute values from the beginning of the track, measured in
+            # number of cycles but the Message.time values are relative to
+            # time of the previous message
+
+            prev_note_end = 0 # contains _absolute_ time of prev note's note_off
+            for event in voice_events:
+
+                # don't update prev_note_end or append Messages for rest events
+                if event.value != "~":
+                    note_duration = (event.end - event.start) * config.note_width
+                    midi_note, velocity = get_midi_note_and_velocity(event.value)
+                    track.append(
+                        Message(
+                            'note_on',
+                            channel=channel,
+                            note=midi_note,
+                            velocity=velocity,
+                            # delta from preceding note_off (or start of song)
+                            time=round((event.start - prev_note_end) * ticks_per_cycle)
+                        )
+                    )
+                    track.append(
+                        Message(
+                            'note_off',
+                            channel=channel,
+                            note=midi_note,
+                            velocity=velocity,
+                            # delta from preceding note_on
+                            time=round(note_duration * ticks_per_cycle)
+                        )
+                    )
+                    prev_note_end = event.start + note_duration
+
+            mid.tracks.append(track)
+            channel += 1
+
+    mid.save(config.midi_file_name)
+
+    return (mid, tick2second(len(cycles) * ticks_per_cycle, mid.ticks_per_beat, tempo))
+
+def play_mini(mini_notation, config):
+    (ignore, total_secs) = mini_to_midi(mini_notation, config)
+    play_midi(config, total_secs)

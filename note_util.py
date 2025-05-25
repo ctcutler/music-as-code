@@ -1,6 +1,6 @@
 from types import GeneratorType
 
-from asciimidi import ASCII_NOTE_RE
+from midi import ASCII_NOTE_RE
 
 def handle_mixed_args(args):
     result = []
