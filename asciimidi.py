@@ -114,7 +114,7 @@ def process_symbol(track, channel, symbol, symbol_start, symbol_end):
 
         rest_length = 0
 
-def mini_to_midi(mini_notation, config):
+def mini_to_midi(mini_notations, config):
     """
     Converts mini notation string to MIDI.
 
@@ -129,54 +129,59 @@ def mini_to_midi(mini_notation, config):
     - handle layers
     - handle swing
     """
+    if isinstance(mini_notations, str):
+        mini_notations = [mini_notations]
+
     mid = MidiFile()
     channel = 0
 
-    cycles = parse_mini(mini_notation)
-    events_by_voice = generate_events(cycles)
     ticks_per_cycle = mid.ticks_per_beat * config.beats_per_measure
     tempo = bpm2tempo(config.beats_per_minute)
 
-    for voice_events in events_by_voice:
-        track = MidiTrack()
-        track.append(MetaMessage('set_tempo', tempo=tempo))
+    for mini in mini_notations:
+        cycles = parse_mini(mini)
+        events_by_voice = generate_events(cycles)
 
-        # it's important to remember here that event.start and event.end are 
-        # absolute values from the beginning of the track, measured in
-        # number of cycles but the Message.time values are relative to
-        # time of the previous message
+        for voice_events in events_by_voice:
+            track = MidiTrack()
+            track.append(MetaMessage('set_tempo', tempo=tempo))
 
-        prev_note_end = 0 # contains _absolute_ time of prev note's note_off
-        for event in voice_events:
+            # it's important to remember here that event.start and event.end are 
+            # absolute values from the beginning of the track, measured in
+            # number of cycles but the Message.time values are relative to
+            # time of the previous message
 
-            # don't update prev_note_end or append Messages for rest events
-            if event.value != "~":
-                note_duration = (event.end - event.start) * config.note_width
-                midi_note, velocity = get_midi_note_and_velocity(event.value)
-                track.append(
-                    Message(
-                        'note_on',
-                        channel=channel,
-                        note=midi_note,
-                        velocity=velocity,
-                        # delta from preceding note_off (or start of song)
-                        time=round((event.start - prev_note_end) * ticks_per_cycle)
+            prev_note_end = 0 # contains _absolute_ time of prev note's note_off
+            for event in voice_events:
+
+                # don't update prev_note_end or append Messages for rest events
+                if event.value != "~":
+                    note_duration = (event.end - event.start) * config.note_width
+                    midi_note, velocity = get_midi_note_and_velocity(event.value)
+                    track.append(
+                        Message(
+                            'note_on',
+                            channel=channel,
+                            note=midi_note,
+                            velocity=velocity,
+                            # delta from preceding note_off (or start of song)
+                            time=round((event.start - prev_note_end) * ticks_per_cycle)
+                        )
                     )
-                )
-                track.append(
-                    Message(
-                        'note_off',
-                        channel=channel,
-                        note=midi_note,
-                        velocity=velocity,
-                        # delta from preceding note_on
-                        time=round(note_duration * ticks_per_cycle)
+                    track.append(
+                        Message(
+                            'note_off',
+                            channel=channel,
+                            note=midi_note,
+                            velocity=velocity,
+                            # delta from preceding note_on
+                            time=round(note_duration * ticks_per_cycle)
+                        )
                     )
-                )
-                prev_note_end = event.start + note_duration
+                    prev_note_end = event.start + note_duration
 
-        mid.tracks.append(track)
-        channel += 1
+            mid.tracks.append(track)
+            channel += 1
 
     mid.save(config.midi_file_name)
 

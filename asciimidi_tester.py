@@ -74,14 +74,14 @@ def test_mini_to_midi(name, expected, mini, note_width=.5):
             track_messages = []
             for mesg in track:
                 if not mesg.is_meta:
-                    track_messages.append((mesg.note, mesg.time))
+                    track_messages.append((mesg.note, mesg.time, mesg.channel))
             e.append(track_messages)
         a = []
         for track in actual:
             track_messages = []
             for mesg in track:
                 if not mesg.is_meta:
-                    track_messages.append((mesg.note, mesg.time))
+                    track_messages.append((mesg.note, mesg.time, mesg.channel))
             a.append(track_messages)
 
         print(f"FAILED: {name}\n{e}\n{a}")
@@ -277,7 +277,6 @@ expected = [[
 ]]
 test_mini_to_midi("mini: rests", expected, "[~ A3 B3 ~ C3]")
 
-
 expected = [
     [
         on("E4", 0, 0), off("E4", 240, 0), 
@@ -291,3 +290,23 @@ expected = [
     ],
 ]
 test_mini_to_midi("mini: polyphonic rests", expected, "[ E4,G4 ~ E4,G4 E4,G4 ]")
+
+expected = [
+    [
+        on("A3", 0, 0), off("A3", 320, 0), 
+        on("B3", 320, 0), off("B3", 320, 0), 
+        on("C3", 320, 0), off("C3", 320, 0), 
+    ],
+    [
+        on("A3", 0, 1), off("A3", 240, 1), 
+        on("B3", 240, 1), off("B3", 240, 1), 
+        on("C3", 240, 1), off("C3", 240, 1), 
+        on("D3", 240, 1), off("D3", 240, 1), 
+        on("A4", 240, 1), off("A4", 240, 1), 
+        on("B4", 240, 1), off("B4", 240, 1), 
+        on("C4", 240, 1), off("C4", 240, 1), 
+        on("D4", 240, 1), off("D4", 240, 1), 
+    ]
+]
+test_mini_to_midi("mini: stacked cycles", expected, ["[A3 B3 C3]", "[A3 B3 C3 D3] [A4 B4 C4 D4]"])
+
