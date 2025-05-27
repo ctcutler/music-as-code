@@ -3,7 +3,7 @@ from fractions import Fraction
 
 from mido import MidiFile, bpm2tempo, tick2second, MidiTrack, Message, MetaMessage
 
-from midi import get_midi_note_and_velocity, play_midi
+from midi import get_midi_note_and_velocity, play_midi, Config
 
 Cycle = namedtuple('Cycle', ['children'])
 Event = namedtuple('Event', ['value', 'start', 'end'], defaults=[-1, -1])
@@ -197,6 +197,54 @@ def mini_to_midi(mini_notations, config):
 
     return (mid, tick2second(len(cycles) * ticks_per_cycle, mid.ticks_per_beat, tempo))
 
-def play_mini(mini_notation, config):
-    (ignore, total_secs) = mini_to_midi(mini_notation, config)
-    play_midi(config, total_secs)
+def notes(mini_string):
+    return Mini().notes(mini_string)
+
+class Mini:
+    NOTES = "NOTES"
+    RHYTHM = "RHYTHM"
+    VELOCITY = "VELOCITY"
+    GATE_LENGTH = "GATE_LENGTH"
+    NUDGE = "NUDGE"
+
+    def __init__(self, patterns=None):
+        self.patterns = patterns if patterns else []
+        self.midi_file = None
+        self.total_secs = None
+        self.config = Config()
+
+    def notes(self, mini_string):
+        self.patterns.append((self.NOTES, mini_string))
+        return self
+
+    def rhythm(self, mini_string):
+        self.patterns.append((self.RHYTHM, mini_string))
+        return self
+
+    def velocity(self, mini_string):
+        self.patterns.append((self.VELOCITY, mini_string))
+        return self
+
+    def gate_length(self, mini_string):
+        self.patterns.append((self.GATE_LENGTH, mini_string))
+        return self
+
+    def nudge(self, mini_string):
+        self.patterns.append((self.NUDGE, mini_string))
+        return self
+
+    def set_config(self, param, val):
+        setattr(self.config, param, val)
+        return self
+
+    def midi(self):
+        # TODO: this is a first pass, each successive pattern overwrites
+        # the previous, # pattern type is ignored, treating everything as
+        # a NOTES pattern
+        for (pattern_type, pattern) in self.patterns:
+            (self.midi_file, self.total_secs) = mini_to_midi(pattern, self.config)
+
+        return self
+
+    def play(self):
+        play_midi(config, self.total_secs)

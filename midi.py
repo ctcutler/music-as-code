@@ -1,24 +1,21 @@
 from collections import namedtuple
+from dataclasses import dataclass, field
 import re
 import sys
 import time
 
 from mido import MidiFile, Message, MetaMessage, open_output, Backend
 
-CONFIG_FIELD_DEFAULTS = {
-    "beats_per_minute": 120,
-    "symbols_per_beat": 2, # 2 means each symbol is an 8th note
-    "note_width": .5,          
-    "swing": .5,               
-    "midi_devices": ["FH-2"], # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
-    "midi_file_name": "new_song.mid",
-    "beats_per_measure": 4,
-}
-Config = namedtuple(
-    'Config', 
-    CONFIG_FIELD_DEFAULTS.keys(), 
-    defaults=CONFIG_FIELD_DEFAULTS.values()
-)
+
+@dataclass
+class Config:
+    beats_per_minute: int = 120
+    symbols_per_beat: int = 2 # 2 means each symbol is an 8th note
+    note_width: float = .5          
+    swing: float = .5               
+    midi_devices: list = field(default_factory=lambda: ["FH-2"]) # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
+    midi_file_name: str = "new_song.mid"
+    beats_per_measure: int = 4
 
 midi_note_numbers = {
   'R': 0, 
