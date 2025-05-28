@@ -33,11 +33,11 @@ def create_event(start, end, value, pattern_type):
     elif pattern_type == RHYTHM:
         return Event(start, end)
     elif pattern_type == VELOCITY:
-        return Event(start, end, velocity=value)
+        return Event(start, end, velocity=int(value))
     elif pattern_type == GATE_LENGTH:
-        return Event(start, end, gate_length=value)
+        return Event(start, end, gate_length=float(value))
     elif pattern_type == NUDGE:
-        return Event(start, end, nudge=value)
+        return Event(start, end, nudge=float(value))
     else:
         raise Exception(f"unexpected pattern type {pattern_type}")
 
@@ -262,15 +262,15 @@ class Mini:
 
             second, merges the new pattern's voices into a list of "already
             merged" voices according to the following rules:
-            - if RH (merging in) starts before or at the same time as LH
-              (already merged) and ends after LH started, RH's value
-              (note, velocity, etc. per the pattern type) overwrites LH's
-            - if LH is empty, RH is copied directly to it
-            - if LH and RH are not the same number of cycles, they are duplicated
+            - if src (merging in) starts before or at the same time as dst
+              (already merged) and ends after dst started, src's value
+              (note, velocity, etc. per the pattern type) overwrites dst's
+            - if dst is empty, src is copied directly to it
+            - if dst and src are not the same number of cycles, they are duplicated
               into the shortest sequence allows for even repeats of both
               sequences of cycles, e.g.: two cycle sequence A B combines with 
               three cycle sequence C D E into six cycle sequence: A/C B/D A/E B/C A/D B/E
-            - where LH and RH have different numbers of voices, additional
+            - where dst and src have different numbers of voices, additional
               event-less "silent" voices are added
 
             special case: when a STACK pattern_type is encountered, all
@@ -280,19 +280,53 @@ class Mini:
         with one track and one channel per voice and a list of messages built
         from those events
         """
-        voices = [[]]
+        voices = []
         mergeable_voices = 0 # all voices at/after this index are available for merging
+        copy_next_pattern = True
         for (pattern_type, pattern) in self.patterns:
             if pattern_type == STACK:
-                voices.append([])
-                mergeable_voices = len(voices) - 1 
+                copy_next_pattern = True
                 continue
 
-            # make pattern events
             cycles = parse_mini(pattern)
+            new_voices = generate_events(cycles, pattern_type)
 
-            # merge into existing message lists (not yet, overwriting instead, for now)
-            voices[mergeable_voices:] = generate_events(cycles, pattern_type)
+            if copy_next_pattern:
+                mergeable_voices = len(voices)
+                voices[mergeable_voices:] = new_voices
+                copy_next_pattern = False
+                continue
+
+            for (src_voice_index, src_voice) in enumerate(new_voices):
+                # TODO: assuming same number of voices in src and dest
+                dst_voice = voices[mergeable_voices+src_voice_index]
+                src_i = 0
+                dst_i = 0
+                while src_i < len(src_voice) and dst_i < len(dst_voice):
+                    src_event = src_voice[src_i]
+                    dst_event = dst_voice[dst_i]
+
+                    # src starts after dst starts: no merge, inc. dst
+                    if src_event.start > dst_event.start:
+                        dst_i += 1
+                    # src ends before (or at) dst start: no merge, inc. src
+                    elif src_event.end <= dst_event.start:
+                        src_i += 1
+                    # src spans dst start: merge
+                    else:
+                        if pattern_type == NOTES:
+                            dst_event.note = src_event.note
+                        elif pattern_type == VELOCITY:
+                            dst_event.velocity = src_event.velocity
+                        elif pattern_type == GATE_LENGTH:
+                            dst_event.gate_length = src_event.gate_length
+                        elif pattern_type == NUDGE:
+                            dst_event.nudge = src_event.nudge
+                        else:
+                            raise Exception(f"unexpected pattern type {pattern_type}")
+
+                        # always increment dst here because we've merged into it
+                        dst_i += 1
 
         (self.midi_file, self.total_secs) = events_to_midi(voices, self.config)
 

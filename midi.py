@@ -53,6 +53,7 @@ def get_midi_note_and_velocity(symbol):
     velocity -= 20 * len(down_volume) 
 
     return midi_note, velocity
+
 def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
     """
     Takes list of note messages where message.time is the offset in seconds since the previous

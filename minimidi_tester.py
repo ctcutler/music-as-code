@@ -22,20 +22,20 @@ def test_raises(name, func, param):
     else:
         print(f"FAILED: {name} No exception thrown!")
 
-def make_message(mesg, note, time, channel):
+def make_message(mesg, note, time, channel, velocity):
     return Message(
         mesg,
         channel=channel,
         note=midi_note_numbers[note[0]] + (int(note[1]) * 12),
-        velocity=VELOCITY,
+        velocity=velocity,
         time=time
     )
 
-def on(note, time, channel=CHANNEL):
-    return make_message('note_on', note, time, channel)
+def on(note, time, channel=CHANNEL, velocity=VELOCITY):
+    return make_message('note_on', note, time, channel, velocity)
 
-def off(note, time, channel=CHANNEL):
-    return make_message('note_off', note, time, channel)
+def off(note, time, channel=CHANNEL, velocity=VELOCITY):
+    return make_message('note_off', note, time, channel, velocity)
 
 def compare_midi(name, mid, expected):
     actual = []
@@ -55,14 +55,14 @@ def compare_midi(name, mid, expected):
             track_messages = []
             for mesg in track:
                 if not mesg.is_meta:
-                    track_messages.append((mesg.note, mesg.time, mesg.channel))
+                    track_messages.append((mesg.note, mesg.time, mesg.channel, mesg.velocity))
             e.append(track_messages)
         a = []
         for track in actual:
             track_messages = []
             for mesg in track:
                 if not mesg.is_meta:
-                    track_messages.append((mesg.note, mesg.time, mesg.channel))
+                    track_messages.append((mesg.note, mesg.time, mesg.channel, mesg.velocity))
             a.append(track_messages)
 
         print(f"FAILED: {name}\n{e}\n{a}")
@@ -313,5 +313,17 @@ expected = [
         on("D4", 240, 1), off("D4", 240, 1), 
     ]
 ]
-
 test_mini("stacked cycles", expected, notes("[A3 B3 C3]").stack().notes("[A3 B3 C3 D3] [A4 B4 C4 D4]"))
+
+# merge same cycle length, same rhythm
+expected = [[
+    on("A3", 0, velocity=127), off("A3", 320, velocity=127), 
+    on("B3", 320, velocity=127), off("B3", 320, velocity=127), 
+    on("C3", 320, velocity=65), off("C3", 320, velocity=65), 
+]]
+test_mini("merged cycles", expected, notes("[A3 B3 C3]").velocity("[127 127 65]"))
+
+# merge same cycle length, different rhythm
+# merge different cycle length, same rhythm
+# merge with more voices in merger
+# merge with more voices in mergee
