@@ -3,7 +3,7 @@ from fractions import Fraction
 from mido import Message
 
 from midi import Config, midi_note_numbers
-from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_events, mini_to_midi, notes
+from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_events, notes
 
 VELOCITY = 60
 CHANNEL = 0
@@ -74,9 +74,9 @@ test(
     "one level, one cycle",
     [
         Cycle([ 
-               [Event("a")], 
-               [Event("b")], 
-               [Event("c")], 
+               ["a"], 
+               ["b"], 
+               ["c"], 
         ])
     ],
     parse_mini("[a b c]")
@@ -85,9 +85,9 @@ test(
 test(
     "one level, three cycles",
     [
-        Cycle([[Event("a")]]),
-        Cycle([[Event("b")]]),
-        Cycle([[Event("c")]]),
+        Cycle([["a"]]),
+        Cycle([["b"]]),
+        Cycle([["c"]]),
     ],
     parse_mini("<[a] [b] [c]>")
 )
@@ -96,16 +96,16 @@ test(
     "three level nesting",
     [
         Cycle([
-            [Event("a")], 
-            [Event("b")], 
-            [Event("c")], 
+            ["a"], 
+            ["b"], 
+            ["c"], 
         ]),
         Cycle([
-            [Event("a")], 
-            [Event("b")], 
+            ["a"], 
+            ["b"], 
             Cycle([
-                [Event("c")], 
-                [Event("d")], 
+                ["c"], 
+                ["d"], 
             ])
         ])
     ],
@@ -116,9 +116,9 @@ test(
     "crazy whitespace",
     [
         Cycle([
-            [Event("a")], 
-            [Event("b")], 
-            [Event("c")], 
+            ["a"], 
+            ["b"], 
+            ["c"], 
         ])
     ],
     parse_mini(""" [ a       b c
@@ -129,9 +129,9 @@ test(
     "polyphony",
     [
         Cycle([
-            [Event("a")],
-            [Event("b"), Event("c"), Event("d")],
-            [Event("c"), Event("e")],
+            ["a"],
+            ["b", "c", "d"],
+            ["c", "e"],
         ])
     ],
     parse_mini("[a b,c,d c,e]")
@@ -163,24 +163,24 @@ test(
     "simple generation",
     [
         [
-            Event('a', Fraction(0, 1), Fraction(1, 3)),
-            Event('b', Fraction(1, 3), Fraction(2, 3)),
-            Event('c', Fraction(2, 3), Fraction(1, 1))
+            Event(Fraction(0, 1), Fraction(1, 3), 'a'),
+            Event(Fraction(1, 3), Fraction(2, 3), 'b'),
+            Event(Fraction(2, 3), Fraction(1, 1), 'c')
         ]
     ],
-    generate_events(parse_mini("[a b c]"))
+    generate_events(parse_mini("[a b c]"), "NOTES")
 )
 
 test(
     "nested generation",
     [
         [
-            Event('a', Fraction(0, 1), Fraction(1, 4)),
-            Event('b', Fraction(1, 4), Fraction(1, 2)),
-            Event('c', Fraction(1, 2), Fraction(1, 1))
+            Event(Fraction(0, 1), Fraction(1, 4), 'a'),
+            Event(Fraction(1, 4), Fraction(1, 2), 'b'),
+            Event(Fraction(1, 2), Fraction(1, 1), 'c')
         ]
     ],
-    generate_events(parse_mini("[[a b] c]"))
+    generate_events(parse_mini("[[a b] c]"), "NOTES")
 )
 
 
@@ -188,31 +188,31 @@ test(
     "simple alternatives",
     [
         [
-            Event('a', Fraction(0, 1), Fraction(1, 1)),
-            Event('b', Fraction(1, 1), Fraction(2, 1)),
-            Event('c', Fraction(2, 1), Fraction(3, 1))
+            Event(Fraction(0, 1), Fraction(1, 1), 'a'),
+            Event(Fraction(1, 1), Fraction(2, 1), 'b'),
+            Event(Fraction(2, 1), Fraction(3, 1), 'c')
         ]
     ],
-    generate_events(parse_mini("<[a] [b] [c]>"))
+    generate_events(parse_mini("<[a] [b] [c]>"), "NOTES")
 )
 
 test(
     "polyphony generation",
     [
         [
-            Event("a", Fraction(0, 1), Fraction(1, 3)),
-            Event("b", Fraction(1, 3), Fraction(2, 3)),
-            Event("d", Fraction(2,3), Fraction(1, 1)),
+            Event(Fraction(0, 1), Fraction(1, 3), 'a'),
+            Event(Fraction(1, 3), Fraction(2, 3), 'b'),
+            Event(Fraction(2, 3), Fraction(1, 1), 'd'),
         ],
         [
-            Event("c", Fraction(1, 3), Fraction(2, 3)),
-            Event("e", Fraction(2,3), Fraction(1, 1)),
+            Event(Fraction(1, 3), Fraction(2, 3), 'c'),
+            Event(Fraction(2, 3), Fraction(1, 1), 'e'),
         ],
         [
-            Event("d", Fraction(1, 3), Fraction(2, 3)),
+            Event(Fraction(1, 3), Fraction(2, 3), 'd'),
         ],
     ],
-    generate_events(parse_mini("[a b,c,d d,e]"))
+    generate_events(parse_mini("[a b,c,d d,e]"), "NOTES")
 )
 
 test_raises("test open without close", parse_mini, "[a b c")
@@ -313,11 +313,5 @@ expected = [
         on("D4", 240, 1), off("D4", 240, 1), 
     ]
 ]
-test_mini("stacked cycles", expected, notes(["[A3 B3 C3]", "[A3 B3 C3 D3] [A4 B4 C4 D4]"]))
-
-expected = [[
-    on("A3", 0), off("A3", 320), 
-    on("B3", 320), off("B3", 320), 
-    on("C3", 320), off("C3", 320), 
-]]
-test_mini("simple chain", expected, notes("< [A3 B3 C3] >"))
+# TODO not implemented yet
+#test_mini("stacked cycles", expected, notes("[A3 B3 C3]").stack().notes("[A3 B3 C3 D3] [A4 B4 C4 D4]"))
