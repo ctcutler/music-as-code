@@ -313,5 +313,5 @@ expected = [
         on("D4", 240, 1), off("D4", 240, 1), 
     ]
 ]
-# TODO not implemented yet
-#test_mini("stacked cycles", expected, notes("[A3 B3 C3]").stack().notes("[A3 B3 C3 D3] [A4 B4 C4 D4]"))
+
+test_mini("stacked cycles", expected, notes("[A3 B3 C3]").stack().notes("[A3 B3 C3 D3] [A4 B4 C4 D4]"))

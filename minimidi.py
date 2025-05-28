@@ -292,7 +292,7 @@ class Mini:
             cycles = parse_mini(pattern)
 
             # merge into existing message lists (not yet, overwriting instead, for now)
-            voices = generate_events(cycles, pattern_type)
+            voices[mergeable_voices:] = generate_events(cycles, pattern_type)
 
         (self.midi_file, self.total_secs) = events_to_midi(voices, self.config)
 
