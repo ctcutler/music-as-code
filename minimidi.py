@@ -161,6 +161,11 @@ def generate_node_events(node, start, end, pattern_type):
 
 
 def events_to_midi(events_by_voice, config, cycle_count):
+    """
+    TODO:
+    - respect Event.gate_length
+    - respect Event.nudge
+    """
     mid = MidiFile()
     channel = 0
 
@@ -318,6 +323,10 @@ def build_voices(pattern_cycles):
 
     return voices
 
+def print_patterns(patterns):
+    for (pattern_type, pattern) in patterns:
+        print(pattern)
+
 def notes(mini_string):
     return Mini().notes(mini_string)
 
@@ -371,6 +380,7 @@ class Mini:
         voices = []
         max_cycle_count = 0
         for patterns in stack:
+            print_patterns(patterns)
             (pattern_cycles, cycle_count) = build_cycles(patterns)
             max_cycle_count = max(cycle_count, max_cycle_count)
             pattern_voices = build_voices(pattern_cycles)
