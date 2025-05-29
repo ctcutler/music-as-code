@@ -1,6 +1,7 @@
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
+from math import lcm
 
 from mido import MidiFile, bpm2tempo, tick2second, MidiTrack, Message, MetaMessage
 
@@ -214,6 +215,107 @@ def events_to_midi(events_by_voice, config):
 
     return (mid, total_secs)
 
+def build_stack(patterns):
+    """
+    Splits list of patterns into a list of lists as defined by STACK elements.
+
+    Takes: list of (pattern_type, pattern) pairs
+    Returns: list of lists of (pattern_type, pattern) pairs
+    """ 
+    stack = []
+    cur = []
+    for (pattern_type, pattern) in patterns:
+        if pattern_type == STACK:
+            if len(cur) > 0:
+                stack.append(cur)
+                cur = []
+        else:
+            cur.append((pattern_type, pattern))
+
+    if len(cur) > 0:
+        stack.append(cur)
+
+    return stack
+
+def build_cycles(patterns):
+    """
+    Converts a list of patterns into a list of cycle lists, all the same length.
+
+    Takes: a list of (pattern_type, pattern) pairs
+    Returns: as list of (pattern_type, cycles) pairs
+    """
+    # build cycles for each pattern
+    pattern_cycles = []
+    for (pattern_type, pattern) in patterns:
+        if pattern_type == STACK:
+            pattern_cycles.append((pattern_type, []))
+        else:
+            pattern_cycles.append((pattern_type, parse_mini(pattern)))
+
+    # make cycle lists all the same length
+    cycle_lengths = [
+        len(cycles) for (pattern_type, cycles) in pattern_cycles if len(cycles) > 0
+    ]
+    least_common_multiple = lcm(*cycle_lengths)
+    pattern_cycles_extended = []
+    for (pattern_type, cycles) in pattern_cycles:
+        if pattern_type == STACK:
+            pattern_cycles_extended.append((pattern_type, cycles))
+        else:
+            extended_cycles = []
+            for i in range(least_common_multiple // len(cycles)):
+                extended_cycles.extend(cycles)
+
+            pattern_cycles_extended.append((pattern_type, extended_cycles))
+
+    return pattern_cycles_extended
+
+def build_voices(pattern_cycles):
+    """
+    Converts cycles lists into events and voices, merging them in the process.
+
+    Takes: a list of (pattern_type, cycles) pairs
+    Returns: a list of "voices" where each voice is a list of Events
+    """
+    voices = []
+    for (pattern_type, cycles) in pattern_cycles:
+        new_voices = generate_events(cycles, pattern_type)
+        if len(voices) == 0:
+            voices.extend(new_voices)
+        else:
+            for (src_voice_index, src_voice) in enumerate(new_voices):
+                # TODO: assuming same number of voices in src and dest
+                dst_voice = voices[src_voice_index]
+                src_i = 0
+                dst_i = 0
+                while src_i < len(src_voice) and dst_i < len(dst_voice):
+                    src_event = src_voice[src_i]
+                    dst_event = dst_voice[dst_i]
+
+                    # src starts after dst starts: no merge, inc. dst
+                    if src_event.start > dst_event.start:
+                        dst_i += 1
+                    # src ends before (or at) dst start: no merge, inc. src
+                    elif src_event.end <= dst_event.start:
+                        src_i += 1
+                    # src spans dst start: merge
+                    else:
+                        if pattern_type == NOTES:
+                            dst_event.note = src_event.note
+                        elif pattern_type == VELOCITY:
+                            dst_event.velocity = src_event.velocity
+                        elif pattern_type == GATE_LENGTH:
+                            dst_event.gate_length = src_event.gate_length
+                        elif pattern_type == NUDGE:
+                            dst_event.nudge = src_event.nudge
+                        else:
+                            raise Exception(f"unexpected pattern type {pattern_type}")
+
+                        # always increment dst here because we've merged into it
+                        dst_i += 1
+
+    return voices
+
 def notes(mini_string):
     return Mini().notes(mini_string)
 
@@ -280,53 +382,13 @@ class Mini:
         with one track and one channel per voice and a list of messages built
         from those events
         """
+
+        stack = build_stack(self.patterns)
         voices = []
-        mergeable_voices = 0 # all voices at/after this index are available for merging
-        copy_next_pattern = True
-        for (pattern_type, pattern) in self.patterns:
-            if pattern_type == STACK:
-                copy_next_pattern = True
-                continue
-
-            cycles = parse_mini(pattern)
-            new_voices = generate_events(cycles, pattern_type)
-
-            if copy_next_pattern:
-                mergeable_voices = len(voices)
-                voices[mergeable_voices:] = new_voices
-                copy_next_pattern = False
-                continue
-
-            for (src_voice_index, src_voice) in enumerate(new_voices):
-                # TODO: assuming same number of voices in src and dest
-                dst_voice = voices[mergeable_voices+src_voice_index]
-                src_i = 0
-                dst_i = 0
-                while src_i < len(src_voice) and dst_i < len(dst_voice):
-                    src_event = src_voice[src_i]
-                    dst_event = dst_voice[dst_i]
-
-                    # src starts after dst starts: no merge, inc. dst
-                    if src_event.start > dst_event.start:
-                        dst_i += 1
-                    # src ends before (or at) dst start: no merge, inc. src
-                    elif src_event.end <= dst_event.start:
-                        src_i += 1
-                    # src spans dst start: merge
-                    else:
-                        if pattern_type == NOTES:
-                            dst_event.note = src_event.note
-                        elif pattern_type == VELOCITY:
-                            dst_event.velocity = src_event.velocity
-                        elif pattern_type == GATE_LENGTH:
-                            dst_event.gate_length = src_event.gate_length
-                        elif pattern_type == NUDGE:
-                            dst_event.nudge = src_event.nudge
-                        else:
-                            raise Exception(f"unexpected pattern type {pattern_type}")
-
-                        # always increment dst here because we've merged into it
-                        dst_i += 1
+        for patterns in stack:
+            pattern_cycles = build_cycles(patterns)
+            pattern_voices = build_voices(pattern_cycles)
+            voices.extend(pattern_voices)
 
         (self.midi_file, self.total_secs) = events_to_midi(voices, self.config)
 
