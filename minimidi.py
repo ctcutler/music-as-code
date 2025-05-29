@@ -160,7 +160,7 @@ def generate_node_events(node, start, end, pattern_type):
         raise Exception(f"unexpected node: {node}")
 
 
-def events_to_midi(events_by_voice, config):
+def events_to_midi(events_by_voice, config, cycle_count):
     mid = MidiFile()
     channel = 0
 
@@ -211,7 +211,7 @@ def events_to_midi(events_by_voice, config):
         channel += 1
 
     mid.save(config.midi_file_name)
-    total_secs = tick2second(len(events_by_voice[0]) * ticks_per_cycle, mid.ticks_per_beat, tempo)
+    total_secs = tick2second(cycle_count * ticks_per_cycle, mid.ticks_per_beat, tempo)
 
     return (mid, total_secs)
 
@@ -242,7 +242,7 @@ def build_cycles(patterns):
     Converts a list of patterns into a list of cycle lists, all the same length.
 
     Takes: a list of (pattern_type, pattern) pairs
-    Returns: as list of (pattern_type, cycles) pairs
+    Returns: a list of (pattern_type, cycles) pairs and the common cycle count
     """
     # build cycles for each pattern
     pattern_cycles = []
@@ -256,19 +256,19 @@ def build_cycles(patterns):
     cycle_lengths = [
         len(cycles) for (pattern_type, cycles) in pattern_cycles if len(cycles) > 0
     ]
-    least_common_multiple = lcm(*cycle_lengths)
+    cycle_count = lcm(*cycle_lengths)
     pattern_cycles_extended = []
     for (pattern_type, cycles) in pattern_cycles:
         if pattern_type == STACK:
             pattern_cycles_extended.append((pattern_type, cycles))
         else:
             extended_cycles = []
-            for i in range(least_common_multiple // len(cycles)):
+            for i in range(cycle_count // len(cycles)):
                 extended_cycles.extend(cycles)
 
             pattern_cycles_extended.append((pattern_type, extended_cycles))
 
-    return pattern_cycles_extended
+    return (pattern_cycles_extended, cycle_count)
 
 def build_voices(pattern_cycles):
     """
@@ -359,42 +359,26 @@ class Mini:
 
     def midi(self):
         """
-        for each pattern:
-            first, converts a list of (pattern_type, pattern) pairs into a
-            2D list of events where the first dimension is "voice" and the
-            second is events in each voice
-
-            second, merges the new pattern's voices into a list of "already
-            merged" voices according to the following rules:
-            - if src (merging in) starts before or at the same time as dst
-              (already merged) and ends after dst started, src's value
-              (note, velocity, etc. per the pattern type) overwrites dst's
-            - if dst is empty, src is copied directly to it
-            - if dst and src are not the same number of cycles, they are duplicated
-              into the shortest sequence allows for even repeats of both
-              sequences of cycles, e.g.: two cycle sequence A B combines with 
-              three cycle sequence C D E into six cycle sequence: A/C B/D A/E B/C A/D B/E
-            - where dst and src have different numbers of voices, additional
-              event-less "silent" voices are added
-
-            special case: when a STACK pattern_type is encountered, all
-            previous voices are frozen and we start with new ones
-
-        once merging is complete, convert the list of voices into a MidiFile 
-        with one track and one channel per voice and a list of messages built
-        from those events
+        How this works generally:
+        - we build a "stack" of groups of patterns that are meant to play
+          simultaneously
+        - for every pattern group we:
+          - build cycles from the individual patterns
+          - merge the cycles and build lists of events (one per simultaneous voice)
+        - create MIDI messages from the per-voice events
         """
-
         stack = build_stack(self.patterns)
         voices = []
+        max_cycle_count = 0
         for patterns in stack:
-            pattern_cycles = build_cycles(patterns)
+            (pattern_cycles, cycle_count) = build_cycles(patterns)
+            max_cycle_count = max(cycle_count, max_cycle_count)
             pattern_voices = build_voices(pattern_cycles)
             voices.extend(pattern_voices)
 
-        (self.midi_file, self.total_secs) = events_to_midi(voices, self.config)
+        (self.midi_file, self.total_secs) = events_to_midi(voices, self.config, cycle_count)
 
         return self
 
     def play(self):
-        play_midi(config, self.total_secs)
+        play_midi(self.config, self.total_secs)
