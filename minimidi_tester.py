@@ -339,5 +339,25 @@ expected = [[
 ]]
 test_mini("merged cycles: different length same rhythm", expected, notes("[A3] [B3] [C3]").velocity("[120] [121]"))
 
-# merge with more voices in merger
-# merge with more voices in mergee
+expected = [
+    [
+        on("A3", 0, velocity=120), off("A3", 480, velocity=120), 
+        on("C3", 480, velocity=123), off("C3", 480, velocity=123), 
+    ],
+    [
+        on("B3", 0, 1, velocity=121), off("B3", 480, 1, velocity=121), 
+    ]
+]
+test_mini("merged cycles: more voices in merger", expected, notes("[A3,B3 C3]").velocity("[120,121,122 123]"))
+
+expected = [
+    [
+        on("A3", 0, velocity=120), off("A3", 480, velocity=120), 
+        on("C3", 480, velocity=123), off("C3", 480, velocity=123), 
+    ],
+    [
+        on("B3", 0, 1), off("B3", 480, 1), 
+    ]
+]
+test_mini("merged cycles: more voices in mergee", expected, notes("[A3,B3 C3]").velocity("[120 123]"))
+

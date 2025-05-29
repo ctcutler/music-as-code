@@ -284,7 +284,9 @@ def build_voices(pattern_cycles):
             voices.extend(new_voices)
         else:
             for (src_voice_index, src_voice) in enumerate(new_voices):
-                # TODO: assuming same number of voices in src and dest
+                if src_voice_index >= len(voices):
+                    break
+
                 dst_voice = voices[src_voice_index]
                 src_i = 0
                 dst_i = 0
