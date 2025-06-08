@@ -376,15 +376,12 @@ class Mini:
           - merge the cycles and build lists of events (one per simultaneous voice)
         - create MIDI messages from the per-voice events
         """
-        stack = build_stack(self.patterns)
+        (pattern_cycles, cycle_count) = build_cycles(self.patterns)
+        stack = build_stack(pattern_cycles)
         voices = []
-        max_cycle_count = 0
-        for patterns in stack:
-            print_patterns(patterns)
-            (pattern_cycles, cycle_count) = build_cycles(patterns)
-            max_cycle_count = max(cycle_count, max_cycle_count)
-            pattern_voices = build_voices(pattern_cycles)
-            voices.extend(pattern_voices)
+        for pattern_cycles in stack:
+            #print_patterns(pattern_cycles)
+            voices += build_voices(pattern_cycles)
 
         (self.midi_file, self.total_secs) = events_to_midi(voices, self.config, cycle_count)
 
