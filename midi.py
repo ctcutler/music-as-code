@@ -1,11 +1,16 @@
 from collections import namedtuple
 from dataclasses import dataclass, field
 import re
+import signal
 import sys
 import time
 
 from mido import MidiFile, Message, MetaMessage, open_output, Backend
 
+def sigterm_handler(signum, frame):
+    raise SystemExit("Program terminated by SIGTERM")
+
+signal.signal(signal.SIGTERM, sigterm_handler)
 
 @dataclass
 class Config:
@@ -104,7 +109,7 @@ def multi_port_play(midi_ports, config, total_secs):
                     for midi_port in midi_ports:
                         midi_port.send(message)
             first_loop = False
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         for midi_port in midi_ports:
             midi_port.send(Message('stop', time=time.time()))
             midi_port.reset()

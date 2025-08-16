@@ -18,6 +18,17 @@ python3 fh2-test.py
 deactivate
 ```
 
+# Re-run on save
+```
+# first time only
+brew install entr
+
+# every time
+. my_env/bin/activate
+echo 2025-08-11.py | entr -r python 2025-08-11.py
+deactivate
+```
+
 # Philsophy
 - plain text, no special/proprietary data format
 - human readable, especially in a monospaced font
@@ -29,6 +40,10 @@ deactivate
     even clearer than they are in conventional sheet music
   - ... and perhaps compose differently because we have the structural aspects at our
     fingertips
+ 
+# To Do
+- add mini notation examples here
+- 
 
 # Examples
 Some music:
