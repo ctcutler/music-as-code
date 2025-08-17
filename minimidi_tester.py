@@ -5,7 +5,7 @@ from mido import Message
 from midi import Config, midi_note_numbers
 from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_events, notes
 
-VELOCITY = 60
+VELOCITY = 5
 CHANNEL = 0
 
 def test(name, expected, actual):
@@ -27,8 +27,8 @@ def make_message(mesg, note, time, channel, velocity):
         mesg,
         channel=channel,
         note=midi_note_numbers[note[0]] + (int(note[1]) * 12),
-        velocity=velocity,
-        time=time
+        velocity=int((velocity/9)*127),
+        time=time,
     )
 
 def on(note, time, channel=CHANNEL, velocity=VELOCITY):
@@ -71,7 +71,7 @@ def test_mini(name, expected, mini_obj):
     compare_midi(name, mini_obj.midi().midi_file, expected)
 
 test(
-    "one level, one cycle",
+    "parse_mini one level, one cycle",
     [
         Cycle([ 
                ["a"], 
@@ -83,7 +83,7 @@ test(
 )
 
 test(
-    "one level, three cycles",
+    "parse_mini one level, three cycles",
     [
         Cycle([["a"]]),
         Cycle([["b"]]),
@@ -93,7 +93,7 @@ test(
 )
 
 test(
-    "three level nesting",
+    "parse_mini three level nesting",
     [
         Cycle([
             ["a"], 
@@ -113,7 +113,7 @@ test(
 )
 
 test(
-    "crazy whitespace",
+    "parse_mini crazy whitespace",
     [
         Cycle([
             ["a"], 
@@ -126,7 +126,7 @@ test(
 )
 
 test(
-    "polyphony",
+    "parse_mini polyphony",
     [
         Cycle([
             ["a"],
@@ -137,9 +137,9 @@ test(
     parse_mini("[a b,c,d c,e]")
 )
 
-test_raises("test open without close", parse_mini, "[a b c")
-test_raises("close without open", parse_mini, "a b c]")
-test_raises("top level without brackets", parse_mini, "a b c")
+test_raises("parse_mini test open without close", parse_mini, "[a b c")
+test_raises("parse_mini close without open", parse_mini, "a b c]")
+test_raises("parse_mini top level without brackets", parse_mini, "a b c")
 
 test(
     "expand simple AC",
@@ -319,48 +319,51 @@ expected = [
 test_mini("stacked cycles", expected, notes("[A3 B3 C3]").stack().notes("[A3 B3 C3 D3] [A4 B4 C4 D4]"))
 
 expected = [[
-    on("A3", 0, velocity=127), off("A3", 320, velocity=127), 
-    on("B3", 320, velocity=127), off("B3", 320, velocity=127), 
-    on("C3", 320, velocity=65), off("C3", 320, velocity=65), 
+    on("A3", 0, velocity=9), off("A3", 320, velocity=9), 
+    on("B3", 320, velocity=9), off("B3", 320, velocity=9), 
+    on("C3", 320, velocity=5), off("C3", 320, velocity=5), 
 ]]
-test_mini("merged cycles", expected, notes("[A3 B3 C3]").velocity("[127 127 65]"))
+test_mini("merged cycles", expected, notes("[A3 B3 C3]").velocity("[9 9 5]"))
 
 expected = [[
-    on("A3", 0, velocity=120), off("A3", 320, velocity=120), 
-    on("B3", 320, velocity=120), off("B3", 320, velocity=120), 
-    on("C3", 320, velocity=121), off("C3", 320, velocity=121), 
+    on("A3", 0, velocity=7), off("A3", 320, velocity=7), 
+    on("B3", 320, velocity=7), off("B3", 320, velocity=7), 
+    on("C3", 320, velocity=8), off("C3", 320, velocity=8), 
 ]]
-test_mini("merged cycles: same length different rhythm", expected, notes("[A3 B3 C3]").velocity("[120 121]"))
+test_mini("merged cycles: same length different rhythm", expected, notes("[A3 B3 C3]").velocity("[7 8]"))
 
 expected = [[
-    on("A3", 0, velocity=120), off("A3", 960, velocity=120), 
-    on("B3", 960, velocity=121), off("B3", 960, velocity=121), 
-    on("C3", 960, velocity=120), off("C3", 960, velocity=120), 
-    on("A3", 960, velocity=121), off("A3", 960, velocity=121), 
-    on("B3", 960, velocity=120), off("B3", 960, velocity=120), 
-    on("C3", 960, velocity=121), off("C3", 960, velocity=121), 
+    on("A3", 0, velocity=7), off("A3", 960, velocity=7), 
+    on("B3", 960, velocity=8), off("B3", 960, velocity=8), 
+    on("C3", 960, velocity=7), off("C3", 960, velocity=7), 
+    on("A3", 960, velocity=8), off("A3", 960, velocity=8), 
+    on("B3", 960, velocity=7), off("B3", 960, velocity=7), 
+    on("C3", 960, velocity=8), off("C3", 960, velocity=8), 
 ]]
-test_mini("merged cycles: different length same rhythm", expected, notes("[A3] [B3] [C3]").velocity("[120] [121]"))
+test_mini("merged cycles: different length same rhythm", expected, notes("[A3] [B3] [C3]").velocity("[7] [8]"))
 
 expected = [
     [
-        on("A3", 0, velocity=120), off("A3", 480, velocity=120), 
-        on("C3", 480, velocity=123), off("C3", 480, velocity=123), 
+        on("A3", 0, velocity=7), off("A3", 480, velocity=7), 
+        on("C3", 480, velocity=9), off("C3", 480, velocity=9), 
     ],
     [
-        on("B3", 0, 1, velocity=121), off("B3", 480, 1, velocity=121), 
+        on("B3", 0, 1, velocity=8), off("B3", 480, 1, velocity=8), 
     ]
 ]
-test_mini("merged cycles: more voices in merger", expected, notes("[A3,B3 C3]").velocity("[120,121,122 123]"))
+test_mini("merged cycles: more voices in merger", expected, notes("[A3,B3 C3]").velocity("[7,8,9 9]"))
 
 expected = [
     [
-        on("A3", 0, velocity=120), off("A3", 480, velocity=120), 
-        on("C3", 480, velocity=123), off("C3", 480, velocity=123), 
+        on("A3", 0, velocity=7), off("A3", 480, velocity=7), 
+        on("C3", 480, velocity=9), off("C3", 480, velocity=9), 
     ],
     [
         on("B3", 0, 1), off("B3", 480, 1), 
     ]
 ]
-test_mini("merged cycles: more voices in mergee", expected, notes("[A3,B3 C3]").velocity("[120 123]"))
+test_mini("merged cycles: more voices in mergee", expected, notes("[A3,B3 C3]").velocity("[7 9]"))
+
+# .rhythm("[x [x x]]").notes("[A3] [B3]")
+# .rhythm("[x [x x]]").notes("[A3,C3] [B3,D3]")
 

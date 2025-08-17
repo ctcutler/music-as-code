@@ -53,7 +53,7 @@ def get_midi_note_and_velocity(symbol):
     else:
         # when the symbol is missing, treat the octave as a MIDI note number (0-127) instead
         midi_note = int(octave)
-    velocity = 60 
+    velocity = 70 
     velocity += 20 * len(up_volume) 
     velocity -= 20 * len(down_volume) 
 

@@ -6,7 +6,7 @@ from midi import Config, midi_note_numbers, add_clock_messages
 TICKS_PER_BEAT = 480
 SYMBOLS_PER_BEAT = 2
 TICKS_PER_NOTE = TICKS_PER_BEAT // SYMBOLS_PER_BEAT
-VELOCITY = 60
+VELOCITY = 70
 CHANNEL = 0
 
 def make_raw_note_message(mesg, raw_note, time):
