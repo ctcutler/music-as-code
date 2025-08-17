@@ -34,7 +34,9 @@ def create_event(start, end, value, pattern_type):
     elif pattern_type == RHYTHM:
         return Event(start, end)
     elif pattern_type == VELOCITY:
-        return Event(start, end, velocity=int(value))
+        velocity = int(value)
+        assert velocity >= 0 and velocity <= 9
+        return Event(start, end, velocity=int((velocity/9)*127))
     elif pattern_type == GATE_LENGTH:
         return Event(start, end, gate_length=float(value))
     elif pattern_type == NUDGE:
@@ -165,6 +167,9 @@ def events_to_midi(events_by_voice, config, cycle_count):
     TODO:
     - respect Event.gate_length
     - respect Event.nudge
+    - support '-' as a syntax for holding notes across rhythmic units, e.g. [A3 [- B3]] where A3 is a dotted half note
+    - do the right thing when chords with differing numbers of notes are combined, e.g. notes [A3,B3,C3] combined with
+      velocity [4]
     """
     mid = MidiFile()
     channel = 0
@@ -329,6 +334,9 @@ def print_patterns(patterns):
 
 def notes(mini_string):
     return Mini().notes(mini_string)
+
+def rhythm(mini_string):
+    return Mini().rhythm(mini_string)
 
 class Mini:
 
