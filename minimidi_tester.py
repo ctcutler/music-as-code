@@ -3,7 +3,7 @@ from fractions import Fraction
 from mido import Message
 
 from midi import Config, midi_note_numbers
-from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_events, notes
+from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_events, notes, rhythm
 
 VELOCITY = 5
 CHANNEL = 0
@@ -364,6 +364,42 @@ expected = [
 ]
 test_mini("merged cycles: more voices in mergee", expected, notes("[A3,B3 C3]").velocity("[7 9]"))
 
-# .rhythm("[x [x x]]").notes("[A3] [B3]")
-# .rhythm("[x [x x]]").notes("[A3,C3] [B3,D3]")
+expected = [
+    [
+        on("A3", 0), off("A3", 480), 
+        on("A3", 480), off("A3", 240), 
+        on("A3", 240), off("A3", 240), 
+        on("B3", 240), off("B3", 480), 
+        on("B3", 480), off("B3", 240), 
+        on("B3", 240), off("B3", 240), 
+    ],
+]
+test_mini("rhythm: monophonic", expected, rhythm("[x [x x]]").notes("[A3] [B3]"))
 
+expected = [
+    [
+        on("A3", 0), off("A3", 480), 
+        on("A3", 480), off("A3", 240), 
+        on("A3", 240), off("A3", 240), 
+        on("B3", 240), off("B3", 480), 
+        on("B3", 480), off("B3", 240), 
+        on("B3", 240), off("B3", 240), 
+    ],
+    [
+        on("C3", 0, 1), off("C3", 480, 1), 
+        on("C3", 480, 1), off("C3", 240, 1), 
+        on("C3", 240, 1), off("C3", 240, 1), 
+        on("D3", 240, 1), off("D3", 480, 1), 
+        on("D3", 480, 1), off("D3", 240, 1), 
+        on("D3", 240, 1), off("D3", 240, 1), 
+    ],
+]
+test_mini("rhythm: polyphonic", expected, rhythm("[x,x [x,x x,x]]").notes("[A3,C3] [B3,D3]"))
+
+# expected:
+# [[(57, 0, 0, 70), (57, 480, 0, 70), (57, 480, 0, 70), (57, 240, 0, 70), (57, 240, 0, 70), (57, 240, 0, 70), (59, 240, 0, 70), (59, 480, 0, 70), (59, 480, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70)], 
+#  [(59, 0, 0, 70), (59, 480, 0, 70), (59, 480, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70), (50, 240, 0, 70), (50, 480, 0, 70), (50, 480, 0, 70), (50, 240, 0, 70), (50, 240, 0, 70), (50, 240, 0, 70)]]
+
+# actual:
+# [[(57, 0, 0, 70), (57, 480, 0, 70), (57, 480, 0, 70), (57, 240, 0, 70), (57, 240, 0, 70), (57, 240, 0, 70), (59, 240, 0, 70), (59, 480, 0, 70), (59, 480, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70)],
+#  [(48, 0, 1, 70), (48, 480, 1, 70), (48, 480, 1, 70), (48, 240, 1, 70), (48, 240, 1, 70), (48, 240, 1, 70), (50, 240, 1, 70), (50, 480, 1, 70), (50, 480, 1, 70), (50, 240, 1, 70), (50, 240, 1, 70), (50, 240, 1, 70)]]
