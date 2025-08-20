@@ -1,7 +1,9 @@
 from collections import namedtuple
+from copy import deepcopy
 from dataclasses import dataclass, field
 from fractions import Fraction
 from math import lcm
+from pprint import pp
 
 from mido import MidiFile, bpm2tempo, tick2second, MidiTrack, Message, MetaMessage
 
@@ -280,6 +282,13 @@ def build_cycles(patterns):
 
     return (pattern_cycles_extended, cycle_count)
 
+def multiply_list(l, n):
+    rv = []
+    for i in range(n):
+        for j in l:
+            rv.append(deepcopy(j))
+    return rv
+
 def build_voices(pattern_cycles):
     """
     Converts cycles lists into events and voices, merging them in the process.
@@ -287,9 +296,18 @@ def build_voices(pattern_cycles):
     Takes: a list of (pattern_type, cycles) pairs
     Returns: a list of "voices" where each voice is a list of Events
     """
+    unmerged_voices = [
+        (pattern_type, generate_events(cycles, pattern_type))
+        for (pattern_type, cycles) in pattern_cycles
+    ]
+    max_voices = max([len(voices) for (pattern_type, voices) in unmerged_voices])
+    unmerged_voices = [
+        (pattern_type, multiply_list(voices, (max_voices // len(voices))))
+        for (pattern_type, voices) in unmerged_voices
+    ]
+
     voices = []
-    for (pattern_type, cycles) in pattern_cycles:
-        new_voices = generate_events(cycles, pattern_type)
+    for (pattern_type, new_voices) in unmerged_voices:
         if len(voices) == 0:
             voices.extend(new_voices)
         else:
@@ -330,7 +348,7 @@ def build_voices(pattern_cycles):
 
 def print_patterns(patterns):
     for (pattern_type, pattern) in patterns:
-        print(pattern)
+        print(f'{pattern_type}: {pattern}')
 
 def notes(mini_string):
     return Mini().notes(mini_string)

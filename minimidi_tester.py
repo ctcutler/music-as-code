@@ -1,4 +1,5 @@
 from fractions import Fraction
+from pprint import pp
 
 from mido import Message
 
@@ -65,7 +66,9 @@ def compare_midi(name, mid, expected):
                     track_messages.append((mesg.note, mesg.time, mesg.channel, mesg.velocity))
             a.append(track_messages)
 
-        print(f"FAILED: {name}\n{e}\n{a}")
+        print(f"FAILED: {name}")
+        pp(e)
+        pp(a)
 
 def test_mini(name, expected, mini_obj):
     compare_midi(name, mini_obj.midi().midi_file, expected)
@@ -359,7 +362,7 @@ expected = [
         on("C3", 480, velocity=9), off("C3", 480, velocity=9), 
     ],
     [
-        on("B3", 0, 1), off("B3", 480, 1), 
+        on("B3", 0, 1, velocity=7), off("B3", 480, 1, velocity=7), 
     ]
 ]
 test_mini("merged cycles: more voices in mergee", expected, notes("[A3,B3 C3]").velocity("[7 9]"))
@@ -396,10 +399,22 @@ expected = [
 ]
 test_mini("rhythm: polyphonic", expected, rhythm("[x,x [x,x x,x]]").notes("[A3,C3] [B3,D3]"))
 
-# expected:
-# [[(57, 0, 0, 70), (57, 480, 0, 70), (57, 480, 0, 70), (57, 240, 0, 70), (57, 240, 0, 70), (57, 240, 0, 70), (59, 240, 0, 70), (59, 480, 0, 70), (59, 480, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70)], 
-#  [(59, 0, 0, 70), (59, 480, 0, 70), (59, 480, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70), (50, 240, 0, 70), (50, 480, 0, 70), (50, 480, 0, 70), (50, 240, 0, 70), (50, 240, 0, 70), (50, 240, 0, 70)]]
-
-# actual:
-# [[(57, 0, 0, 70), (57, 480, 0, 70), (57, 480, 0, 70), (57, 240, 0, 70), (57, 240, 0, 70), (57, 240, 0, 70), (59, 240, 0, 70), (59, 480, 0, 70), (59, 480, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70), (59, 240, 0, 70)],
-#  [(48, 0, 1, 70), (48, 480, 1, 70), (48, 480, 1, 70), (48, 240, 1, 70), (48, 240, 1, 70), (48, 240, 1, 70), (50, 240, 1, 70), (50, 480, 1, 70), (50, 480, 1, 70), (50, 240, 1, 70), (50, 240, 1, 70), (50, 240, 1, 70)]]
+expected = [
+    [
+        on("A3", 0), off("A3", 480), 
+        on("A3", 480), off("A3", 240), 
+        on("A3", 240), off("A3", 240), 
+        on("B3", 240), off("B3", 480), 
+        on("B3", 480), off("B3", 240), 
+        on("B3", 240), off("B3", 240), 
+    ],
+    [
+        on("C3", 0, 1), off("C3", 480, 1), 
+        on("C3", 480, 1), off("C3", 240, 1), 
+        on("C3", 240, 1), off("C3", 240, 1), 
+        on("D3", 240, 1), off("D3", 480, 1), 
+        on("D3", 480, 1), off("D3", 240, 1), 
+        on("D3", 240, 1), off("D3", 240, 1), 
+    ],
+]
+test_mini("rhythm: mismatched polyphonic", expected, rhythm("[x [x x]]").notes("[A3,C3] [B3,D3]"))
