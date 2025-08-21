@@ -98,6 +98,7 @@ def multi_port_play(midi_ports, config, total_secs):
     start_time = time.time()
     first_loop = True
     previous_message_type = "note_on"
+    print("="*72)
     try:
         while True:
             for message in messages:
@@ -122,6 +123,7 @@ def multi_port_play(midi_ports, config, total_secs):
 
                 previous_message_type = message.type
 
+            print("-"*72)
             first_loop = False
     except (KeyboardInterrupt, SystemExit):
         for midi_port in midi_ports:
