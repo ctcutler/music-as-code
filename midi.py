@@ -42,8 +42,14 @@ midi_note_numbers = {
   'Bb': 22,
   'B': 23, 
 }
+midi_note_names = {v: k for (k, v) in midi_note_numbers.items()}
 
 ASCII_NOTE_RE = re.compile('(\D*)(\d+)(\+*)(\-*)')
+
+def get_note_name(number):
+    octave = (number // 12) - 1
+    note = midi_note_names[number - (octave * 12)]
+    return f"{note}{octave}"
 
 def get_midi_note_and_velocity(symbol):
     m = ASCII_NOTE_RE.search(symbol)
@@ -91,6 +97,7 @@ def multi_port_play(midi_ports, config, total_secs):
     messages = add_clock_messages(list(midi_file), config.beats_per_minute, 24)
     start_time = time.time()
     first_loop = True
+    previous_message_type = "note_on"
     try:
         while True:
             for message in messages:
@@ -103,11 +110,18 @@ def multi_port_play(midi_ports, config, total_secs):
                 sleep_duration = (message.time + start_time) - time.time()
 
                 if sleep_duration > 0.0:
+                    if previous_message_type == "note_on":
+                        print("")
                     time.sleep(sleep_duration)
 
                 if not isinstance(message, MetaMessage):
                     for midi_port in midi_ports:
+                        if message.type == "note_on":
+                            print(f"{get_note_name(message.note)} ", end="")
                         midi_port.send(message)
+
+                previous_message_type = message.type
+
             first_loop = False
     except (KeyboardInterrupt, SystemExit):
         for midi_port in midi_ports:
