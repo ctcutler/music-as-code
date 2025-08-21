@@ -34,7 +34,7 @@ def create_event(start, end, value, pattern_type):
     if pattern_type == NOTES:
         return Event(start, end, value)
     elif pattern_type == RHYTHM:
-        return Event(start, end)
+        return Event(start, end, value)
     elif pattern_type == VELOCITY:
         velocity = int(value)
         assert velocity >= 0 and velocity <= 9
@@ -331,7 +331,9 @@ def build_voices(pattern_cycles):
                     # src spans dst start: merge
                     else:
                         if pattern_type == NOTES:
-                            dst_event.note = src_event.note
+                            # we don't overwrite rests
+                            if dst_event.note != "~":
+                                dst_event.note = src_event.note
                         elif pattern_type == VELOCITY:
                             dst_event.velocity = src_event.velocity
                         elif pattern_type == GATE_LENGTH:

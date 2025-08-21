@@ -418,3 +418,13 @@ expected = [
     ],
 ]
 test_mini("rhythm: mismatched polyphonic", expected, rhythm("[x [x x]]").notes("[A3,C3] [B3,D3]"))
+
+expected = [
+    [
+        on("A3", 0), off("A3", 480), 
+        on("A3", 960), off("A3", 240), 
+        on("B3", 240), off("B3", 480), 
+        on("B3", 960), off("B3", 240), 
+    ],
+]
+test_mini("rhythm: rests", expected, rhythm("[x [~ x]]").notes("[A3] [B3]"))
