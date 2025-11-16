@@ -4,8 +4,9 @@ As I have added and refined features, the internal architecture of this tool has
 
 # TODO
 
-- [ ] design
+- [X] rough design
 - [ ] refactor/port tests to an actual testing framework
+- [ ] add infra for doing this with types
 - [ ] implement
 
 # Major Functionality
