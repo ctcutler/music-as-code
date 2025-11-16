@@ -1,62 +1,73 @@
 from note_util import n, set_key
 
-def test(name, expected, actual):
-    if expected == actual:
-        print(f"PASSED: {name}")
-    else:
-        print(f"FAILED: {name}\nexpected: {expected}\nactual: {actual}")
+def test_str_of_note():
+    # str of note
+    assert "Ab2" == str(n("Ab2", "A minor"))
+    # f string of note
+    assert "Ab2" == f"{n('Ab2')}"
+    # f string of note with special formatting
+    assert "Ab2" == f"{n('Ab2'):3}"
 
-# str of Note
-test("str of note", "Ab2", str(n("Ab2", "A minor")))
-test("f string of note", "Ab2", f"{n('Ab2')}")
-test("f string of note with special formatting", "Ab2", f"{n('Ab2'):3}")
+def test_add_in_key():
+    set_key("G major")
+    # add to note w/key
+    assert n("B3") == n("G3", "G major")+2
+    # add to note w/o key
+    assert n("A3") == n("G3")+1
+    # add to note cross C octave only
+    assert n("D4") == n("B3")+2
+    # add to note cross key octave only
+    assert n("A4") == n("D4")+4
+    # add to note cross C & key octave only
+    assert n("D4") == n("E3")+6
 
-# add in key
-set_key("G major")
-test("add to note w/key", n("B3"), n("G3", "G major")+2)
-test("add to note w/o key", n("A3"), n("G3")+1)
-test("add to note cross C octave only", n("D4"), n("B3")+2)
-test("add to note cross key octave only", n("A4"), n("D4")+4)
-test("add to note cross C & key octave only", n("D4"), n("E3")+6)
+def test_subtract_in_key():
+    # subtract from note w/key
+    assert n("E3", "E minor") == n("G3", "E minor")-2
+    # subtract from note w/o key
+    assert n("F#3") == n("G3")-1
+    # subtract from note cross C octave only
+    assert n("B2") == n("D3")-2
+    # subtract from note cross key octave only
+    assert n("C4") == n("G4")-4
+    # "subtract from note cross C & key octave only
+    assert n("A2") == n("G3")-6
 
-# subtract in key
-test("subtract from note w/key", n("E3", "E minor"), n("G3", "E minor")-2)
-test("subtract from note w/o key", n("F#3"), n("G3")-1)
-test("subtract from note cross C octave only", n("B2"), n("D3")-2)
-test("subtract from note cross key octave only", n("C4"), n("G4")-4)
-test("subtract from note cross C & key octave only", n("A2"), n("G3")-6)
+def test_add_in_key_intervals():
+    set_key("G major")
+    # add in key interval to note w/key
+    assert n("B3") == n("G3", "G major")+"3rd"
+    # add in key interval to note w/o key
+    assert n("A3") == n("G3")+"2nd"
+    # add in key interval to note cross C octave only
+    assert n("D4") == n("B3")+"3rd"
+    # add in key interval to note cross key octave only
+    assert n("A4") == n("D4")+"5th"
+    # add in key interval to note cross C & key octave only
+    assert n("D4") == n("E3")+"7th"
 
-# add in key intervals
-set_key("G major")
-test("add in key interval to note w/key", n("B3"), n("G3", "G major")+"3rd")
-test("add in key interval to note w/o key", n("A3"), n("G3")+"2nd")
-test("add in key interval to note cross C octave only", n("D4"), n("B3")+"3rd")
-test("add in key interval to note cross key octave only", n("A4"), n("D4")+"5th")
-test("add in key interval to note cross C & key octave only", n("D4"), n("E3")+"7th")
+def test_subtract_in_key_intervals():
+    # subtract in key interval from note w/key
+    assert n("E3", "E minor") == n("G3", "E minor")-"3rd"
+    # subtract in key interval from note w/o key
+    assert n("F#3") == n("G3")-"2nd"
+    # subtract in key interval from note cross C octave only
+    assert n("B2") == n("D3")-"3rd"
+    # subtract in key interval from note cross key octave only
+    assert n("C4") == n("G4")-"5th"
+    # subtract in key interval from note cross C & key octave only
+    assert n("A2") == n("G3")-"7th"
 
-# subtract in key intervals
-test("subtract in key interval from note w/key", n("E3", "E minor"), n("G3", "E minor")-"3rd")
-test("subtract in key interval from note w/o key", n("F#3"), n("G3")-"2nd")
-test("subtract in key interval from note cross C octave only", n("B2"), n("D3")-"3rd")
-test("subtract in key interval from note cross key octave only", n("C4"), n("G4")-"5th")
-test("subtract in key interval from note cross C & key octave only", n("A2"), n("G3")-"7th")
+def test_add_fixed_intervals():
+    set_key("G major")
+    # add fixed interval to note
+    assert n("A3") == n("G3")+"M2"
+    # add fixed interval to note (leave key)
+    assert n("G#3") == n("G3")+"m2"
 
-# add fixed intervals
-set_key("G major")
-test("add fixed interval to note", n("A3"), n("G3")+"M2")
-test("add fixed interval to note (leave key)", n("G#3"), n("G3")+"m2")
-
-# subtract fixed intervals
-set_key("G major")
-test("subtract fixed interval from note", n("F#3"), n("G3")-"m2")
-test("subtract fixed interval from note (leave key)", n("F3"), n("G3")-"M2")
-
-## add/subtract in key after add/subtracting fixed interval
-## FIXME: let's not add this unless we need it
-#set_key("G major")
-#p = n("G3") + "m2"
-#test("add in key after adding fixed (out of key)", n("A3"), p + 1)
-#test("subtract in key after adding fixed (out of key)", n("G3"), p - 1)
-#p = n("A3") - "m2"
-#test("add in key after subtracting fixed (out of key)", n("A3"), p + 1)
-#test("subtract in key after subtracting adding fixed (out of key)", n("G3"), p - 1)
+def test_subtract_fixed_intervals():
+    set_key("G major")
+    # subtract fixed interval from note
+    assert n("F#3") == n("G3")-"m2"
+    # subtract fixed interval from note (leave key)
+    assert n("F3") == n("G3")-"M2"
