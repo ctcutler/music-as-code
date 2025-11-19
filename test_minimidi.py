@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import pytest
 
 from fractions import Fraction
@@ -11,20 +10,6 @@ from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_eve
 
 VELOCITY = 5
 CHANNEL = 0
-
-def t(name, expected, actual):
-    if expected == actual:
-        print(f"PASSED: {name}")
-    else:
-        print(f"FAILED: {name}\nexpected: {expected}\nactual: {actual}")
-
-def t_raises(name, func, param):
-    try:
-        func(param)
-    except:
-        print(f"PASSED: {name}")
-    else:
-        print(f"FAILED: {name} No exception thrown!")
 
 def make_message(mesg, note, time, channel, velocity):
     return Message(
@@ -41,45 +26,6 @@ def on(note, time, channel=CHANNEL, velocity=VELOCITY):
 def off(note, time, channel=CHANNEL, velocity=VELOCITY):
     return make_message('note_off', note, time, channel, velocity)
 
-def compare_midi(name, mid, expected):
-    actual = []
-    for track in mid.tracks:
-        track_messages = []
-        for mesg in track:
-            if not mesg.is_meta:
-                track_messages.append(mesg)
-
-        actual.append(track_messages)
-
-    if expected == actual:
-        print(f"PASSED: {name}")
-    else:
-        e = []
-        for track in expected:
-            track_messages = []
-            for mesg in track:
-                if not mesg.is_meta:
-                    track_messages.append((mesg.note, mesg.time, mesg.channel, mesg.velocity))
-            e.append(track_messages)
-        a = []
-        for track in actual:
-            track_messages = []
-            for mesg in track:
-                if not mesg.is_meta:
-                    track_messages.append((mesg.note, mesg.time, mesg.channel, mesg.velocity))
-            a.append(track_messages)
-
-        print(f"FAILED: {name}")
-        pp(e)
-        pp(a)
-
-@dataclass
-class Note:
-    note:str
-    note_type:str
-    time:int
-    channel:int = CHANNEL
-
 @pytest.fixture
 def mid_factory():
 
@@ -92,9 +38,6 @@ def mid_factory():
         return MidiFile(tracks=tracks)
 
     return factory
-
-def t_mini(name, expected, mini_obj):
-    compare_midi(name, mini_obj.midi().midi_file, expected)
 
 def test_parse_one_level_one_cycle():
     expected = [ Cycle([ ["a"], ["b"], ["c"], ]) ]
