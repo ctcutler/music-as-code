@@ -1,7 +1,10 @@
+from dataclasses import dataclass
+import pytest
+
 from fractions import Fraction
 from pprint import pp
 
-from mido import Message
+from mido import Message, MidiFile, MidiTrack, MetaMessage
 
 from midi import Config, midi_note_numbers
 from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_events, notes, rhythm
@@ -9,13 +12,13 @@ from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_eve
 VELOCITY = 5
 CHANNEL = 0
 
-def test(name, expected, actual):
+def t(name, expected, actual):
     if expected == actual:
         print(f"PASSED: {name}")
     else:
         print(f"FAILED: {name}\nexpected: {expected}\nactual: {actual}")
 
-def test_raises(name, func, param):
+def t_raises(name, func, param):
     try:
         func(param)
     except:
@@ -70,34 +73,43 @@ def compare_midi(name, mid, expected):
         pp(e)
         pp(a)
 
-def test_mini(name, expected, mini_obj):
+@dataclass
+class Note:
+    note:str
+    note_type:str
+    time:int
+    channel:int = CHANNEL
+
+@pytest.fixture
+def mid_factory():
+
+    def factory(voices):
+        set_tempo_message = MetaMessage('set_tempo', tempo=500000, time=0)
+        tracks = [ 
+            MidiTrack([ set_tempo_message ] + messages)
+            for messages in voices
+        ]
+        return MidiFile(tracks=tracks)
+
+    return factory
+
+def t_mini(name, expected, mini_obj):
     compare_midi(name, mini_obj.midi().midi_file, expected)
 
-test(
-    "parse_mini one level, one cycle",
-    [
-        Cycle([ 
-               ["a"], 
-               ["b"], 
-               ["c"], 
-        ])
-    ],
-    parse_mini("[a b c]")
-)
+def test_parse_one_level_one_cycle():
+    expected = [ Cycle([ ["a"], ["b"], ["c"], ]) ]
+    assert expected == parse_mini("[a b c]")
 
-test(
-    "parse_mini one level, three cycles",
-    [
+def test_parse_one_level_three_cycles():
+    expected = [
         Cycle([["a"]]),
         Cycle([["b"]]),
         Cycle([["c"]]),
-    ],
-    parse_mini("<[a] [b] [c]>")
-)
+    ]
+    assert expected == parse_mini("<[a] [b] [c]>")
 
-test(
-    "parse_mini three level nesting",
-    [
+def test_parse_three_level_nesting():
+    expected = [
         Cycle([
             ["a"], 
             ["b"], 
@@ -111,97 +123,81 @@ test(
                 ["d"], 
             ])
         ])
-    ],
-    parse_mini("[ a b c ] [a b [c d]]")
-)
+    ]
+    assert expected == parse_mini("[ a b c ] [a b [c d]]")
 
-test(
-    "parse_mini crazy whitespace",
-    [
-        Cycle([
-            ["a"], 
-            ["b"], 
-            ["c"], 
-        ])
-    ],
-    parse_mini(""" [ a       b c
+def test_parse_crazy_whitespace():
+    expected = [ Cycle([ ["a"], ["b"], ["c"], ]) ]
+    assert expected == parse_mini(""" [ a       b c
           ] """)
-)
 
-test(
-    "parse_mini polyphony",
-    [
+def test_parse_polyphony():
+    expected = [
         Cycle([
             ["a"],
             ["b", "c", "d"],
             ["c", "e"],
         ])
-    ],
-    parse_mini("[a b,c,d c,e]")
-)
+    ]
+    assert expected == parse_mini("[a b,c,d c,e]")
 
-test_raises("parse_mini test open without close", parse_mini, "[a b c")
-test_raises("parse_mini close without open", parse_mini, "a b c]")
-test_raises("parse_mini top level without brackets", parse_mini, "a b c")
+def test_parse_open_without_close():
+    with pytest.raises(Exception):
+        parse_mini("[a b c")
 
-test(
-    "expand simple AC",
-    "[a b c] [a b d]",
-    expand_alternatives("[a b <c d>]")
-)
+def test_parse_close_without_open():
+    with pytest.raises(Exception):
+        parse_mini("a b c]")
 
-test(
-    "expand non-nested ACs",
-    "[a b c [e f]] [a b c [e g]] [a b d [e f]] [a b d [e g]]",
-    expand_alternatives("[a b <c d> [e <f g>]]")
-)
+def test_parse_top_level_without_brackets():
+    with pytest.raises(Exception):
+        parse_mini("a b c")
 
-test(
-    "expand nested ACs",
-    "[a b c] [a b d] [a b c] [a b e]",
-    expand_alternatives("[a b <c <d e>>]")
-)
+def test_expand_simple_AC():
+    expected = "[a b c] [a b d]"
+    assert expected == expand_alternatives("[a b <c d>]")
 
-test(
-    "simple generation",
-    [
+def test_expand_non_nested_ACs():
+    expected = "[a b c [e f]] [a b c [e g]] [a b d [e f]] [a b d [e g]]"
+    assert expected == expand_alternatives("[a b <c d> [e <f g>]]")
+
+def test_expand_nested_ACs():
+    expected = "[a b c] [a b d] [a b c] [a b e]"
+    assert expected == expand_alternatives("[a b <c <d e>>]")
+
+def test_simple_generation():
+    expected = [
         [
             Event(Fraction(0, 1), Fraction(1, 3), 'a'),
             Event(Fraction(1, 3), Fraction(2, 3), 'b'),
             Event(Fraction(2, 3), Fraction(1, 1), 'c')
         ]
-    ],
-    generate_events(parse_mini("[a b c]"), "NOTES")
-)
+    ]
+    assert expected == generate_events(parse_mini("[a b c]"), "NOTES")
 
-test(
-    "nested generation",
-    [
+def test_nested_generation():
+    expected = [
         [
             Event(Fraction(0, 1), Fraction(1, 4), 'a'),
             Event(Fraction(1, 4), Fraction(1, 2), 'b'),
             Event(Fraction(1, 2), Fraction(1, 1), 'c')
         ]
-    ],
-    generate_events(parse_mini("[[a b] c]"), "NOTES")
-)
+    ]
+    assert expected == generate_events(parse_mini("[[a b] c]"), "NOTES")
 
 
-test(
-    "simple alternatives",
-    [
+def test_simple_alternatives():
+    expected = [
         [
             Event(Fraction(0, 1), Fraction(1, 1), 'a'),
             Event(Fraction(1, 1), Fraction(2, 1), 'b'),
             Event(Fraction(2, 1), Fraction(3, 1), 'c')
         ]
-    ],
-    generate_events(parse_mini("<[a] [b] [c]>"), "NOTES")
-)
+    ]
+    assert expected == generate_events(parse_mini("<[a] [b] [c]>"), "NOTES")
 
-test(
-    "polyphony generation",
-    [
+def polyphony_generation():
+    expected = [
         [
             Event(Fraction(0, 1), Fraction(1, 3), 'a'),
             Event(Fraction(1, 3), Fraction(2, 3), 'b'),
@@ -214,217 +210,276 @@ test(
         [
             Event(Fraction(1, 3), Fraction(2, 3), 'd'),
         ],
-    ],
-    generate_events(parse_mini("[a b,c,d d,e]"), "NOTES")
-)
+    ]
+    assert expected == generate_events(parse_mini("[a b,c,d d,e]"), "NOTES")
 
-test_raises("test open without close", parse_mini, "[a b c")
-test_raises("close without open", parse_mini, "a b c]")
-test_raises("top level without brackets", parse_mini, "a b c")
+def test_mini_open_without_close():
+    with pytest.raises(Exception):
+        parse_mini("[a b c")
+
+def test_mini_close_without_open():
+    with pytest.raises(Exception):
+        parse_mini("a b c]")
+
+def test_mini_top_level_without_brackets():
+    with pytest.raises(Exception):
+        parse_mini("a b c")
 
 # 480 ticks per 4/4 quarter note
 # 1920 ticks per bar/cycle
 # 640 ticks per 3/4 quarter note
 # 320 ticks between ons and offs at 50% note length
-expected = [[
-    on("A3", 0), off("A3", 320), 
-    on("B3", 320), off("B3", 320), 
-    on("C3", 320), off("C3", 320), 
-]]
-test_mini("one level one cycle", expected, notes("[A3 B3 C3]"))
-expected = [[
-    on("A3", 0), off("A3", 960), 
-    on("B3", 960), off("B3", 960), 
-    on("C3", 960), off("C3", 960), 
-]]
-test_mini("one level three cycles", expected, notes("<[A3] [B3] [C3]>"))
-expected = [[
-    on("A3", 0), off("A3", 320), 
-    on("B3", 320), off("B3", 320), 
-    on("C3", 320), off("C3", 320), 
-    on("A3", 320), off("A3", 320), 
-    on("B3", 320), off("B3", 320), 
-    on("C3", 320), off("C3", 160), 
-    on("D3", 160), off("D3", 160), 
-]]
-test_mini("three level nesting", expected, notes("[A3 B3 C3] [A3 B3 [C3 D3]]"))
-expected = [[
-    on("A3", 0), off("A3", 320), 
-    on("B3", 320), off("B3", 320), 
-    on("C3", 320), off("C3", 320), 
-]]
-test_mini("crazy whitespace", expected, notes(""" [ A3       B3 C3
-          ] """))
-expected = [
-    [
-        on("A3", 0, 0), off("A3", 320, 0), 
-        on("B3", 320, 0), off("B3", 320, 0), 
-        on("C3", 320, 0), off("C3", 320, 0), 
-    ],
-    [
-        on("C3", 640, 1), off("C3", 320, 1), 
-        on("E3", 320, 1), off("E3", 320, 1), 
-    ],
-    [
-        on("D3", 640, 2), off("D3", 320, 2), 
-    ],
-]
-test_mini("polyphony", expected, notes("[A3 B3,C3,D3 C3,E3]"))
 
-expected = [[
-    on("A3", 0), off("A3", 160), 
-    on("B3", 480), off("B3", 160), 
-    on("C3", 480), off("C3", 160), 
-]]
-test_mini("25% note width", expected, notes("[A3 B3 C3]").set_config("note_width", .25))
+def test_one_level_one_cycle(mid_factory):
+    expected = mid_factory([[
+        on("A3", 0), off("A3", 320), 
+        on("B3", 320), off("B3", 320), 
+        on("C3", 320), off("C3", 320), 
+    ]])
+    actual = notes("[A3 B3 C3]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [[
-    on("A3", 384), off("A3", 192), 
-    on("B3", 192), off("B3", 192), 
-    on("C3", 192+384), off("C3", 192), 
-]]
-test_mini("rests", expected, notes("[~ A3 B3 ~ C3]"))
+def test_one_level_three_cycles(mid_factory):
+    expected = mid_factory([[
+        on("A3", 0), off("A3", 960), 
+        on("B3", 960), off("B3", 960), 
+        on("C3", 960), off("C3", 960), 
+    ]])
+    actual = notes("<[A3] [B3] [C3]>").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [
-    [
-        on("E4", 0, 0), off("E4", 240, 0), 
-        on("E4", 240+480, 0), off("E4", 240, 0), 
-        on("E4", 240, 0), off("E4", 240, 0), 
-    ],
-    [
-        on("G4", 0, 1), off("G4", 240, 1), 
-        on("G4", 240+480, 1), off("G4", 240, 1), 
-        on("G4", 240, 1), off("G4", 240, 1), 
-    ],
-]
-test_mini("polyphonic rests", expected, notes("[ E4,G4 ~ E4,G4 E4,G4 ]"))
+def test_three_level_nesting(mid_factory):
+    expected = mid_factory([[
+        on("A3", 0), off("A3", 320), 
+        on("B3", 320), off("B3", 320), 
+        on("C3", 320), off("C3", 320), 
+        on("A3", 320), off("A3", 320), 
+        on("B3", 320), off("B3", 320), 
+        on("C3", 320), off("C3", 160), 
+        on("D3", 160), off("D3", 160), 
+    ]])
+    actual = notes("[A3 B3 C3] [A3 B3 [C3 D3]]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [
-    [
-        on("A3", 0, 0), off("A3", 320, 0), 
-        on("B3", 320, 0), off("B3", 320, 0), 
-        on("C3", 320, 0), off("C3", 320, 0), 
-        on("A3", 320, 0), off("A3", 320, 0), 
-        on("B3", 320, 0), off("B3", 320, 0), 
-        on("C3", 320, 0), off("C3", 320, 0), 
-    ],
-    [
-        on("A3", 0, 1), off("A3", 240, 1), 
-        on("B3", 240, 1), off("B3", 240, 1), 
-        on("C3", 240, 1), off("C3", 240, 1), 
-        on("D3", 240, 1), off("D3", 240, 1), 
-        on("A4", 240, 1), off("A4", 240, 1), 
-        on("B4", 240, 1), off("B4", 240, 1), 
-        on("C4", 240, 1), off("C4", 240, 1), 
-        on("D4", 240, 1), off("D4", 240, 1), 
-    ]
-]
-test_mini("stacked cycles", expected, notes("[A3 B3 C3]").stack().notes("[A3 B3 C3 D3] [A4 B4 C4 D4]"))
+def test_crazy_whitespace(mid_factory):
+    expected = mid_factory([[
+        on("A3", 0), off("A3", 320), 
+        on("B3", 320), off("B3", 320), 
+        on("C3", 320), off("C3", 320), 
+    ]])
+    actual = notes(""" [ A3       B3 C3
+          ] """).midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [[
-    on("A3", 0, velocity=9), off("A3", 320, velocity=9), 
-    on("B3", 320, velocity=9), off("B3", 320, velocity=9), 
-    on("C3", 320, velocity=5), off("C3", 320, velocity=5), 
-]]
-test_mini("merged cycles", expected, notes("[A3 B3 C3]").velocity("[9 9 5]"))
+def test_polyphony(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0, 0), off("A3", 320, 0), 
+            on("B3", 320, 0), off("B3", 320, 0), 
+            on("C3", 320, 0), off("C3", 320, 0), 
+        ],
+        [
+            on("C3", 640, 1), off("C3", 320, 1), 
+            on("E3", 320, 1), off("E3", 320, 1), 
+        ],
+        [
+            on("D3", 640, 2), off("D3", 320, 2), 
+        ],
+    ])
+    actual = notes("[A3 B3,C3,D3 C3,E3]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [[
-    on("A3", 0, velocity=7), off("A3", 320, velocity=7), 
-    on("B3", 320, velocity=7), off("B3", 320, velocity=7), 
-    on("C3", 320, velocity=8), off("C3", 320, velocity=8), 
-]]
-test_mini("merged cycles: same length different rhythm", expected, notes("[A3 B3 C3]").velocity("[7 8]"))
+def test_25_percent_note_width(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0), off("A3", 160), 
+            on("B3", 480), off("B3", 160), 
+            on("C3", 480), off("C3", 160), 
+        ],
+    ])
+    actual = notes("[A3 B3 C3]").set_config("note_width", .25).midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [[
-    on("A3", 0, velocity=7), off("A3", 960, velocity=7), 
-    on("B3", 960, velocity=8), off("B3", 960, velocity=8), 
-    on("C3", 960, velocity=7), off("C3", 960, velocity=7), 
-    on("A3", 960, velocity=8), off("A3", 960, velocity=8), 
-    on("B3", 960, velocity=7), off("B3", 960, velocity=7), 
-    on("C3", 960, velocity=8), off("C3", 960, velocity=8), 
-]]
-test_mini("merged cycles: different length same rhythm", expected, notes("[A3] [B3] [C3]").velocity("[7] [8]"))
+def test_rests(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 384), off("A3", 192), 
+            on("B3", 192), off("B3", 192), 
+            on("C3", 192+384), off("C3", 192), 
+        ],
+    ])
+    actual = notes("[~ A3 B3 ~ C3]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [
-    [
-        on("A3", 0, velocity=7), off("A3", 480, velocity=7), 
-        on("C3", 480, velocity=9), off("C3", 480, velocity=9), 
-    ],
-    [
-        on("B3", 0, 1, velocity=8), off("B3", 480, 1, velocity=8), 
-    ]
-]
-test_mini("merged cycles: more voices in merger", expected, notes("[A3,B3 C3]").velocity("[7,8,9 9]"))
+def test_polyphonic_rests(mid_factory):
+    expected = mid_factory([
+        [
+            on("E4", 0, 0), off("E4", 240, 0), 
+            on("E4", 240+480, 0), off("E4", 240, 0), 
+            on("E4", 240, 0), off("E4", 240, 0), 
+        ],
+        [
+            on("G4", 0, 1), off("G4", 240, 1), 
+            on("G4", 240+480, 1), off("G4", 240, 1), 
+            on("G4", 240, 1), off("G4", 240, 1), 
+        ],
+    ])
+    actual = notes("[ E4,G4 ~ E4,G4 E4,G4 ]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [
-    [
-        on("A3", 0, velocity=7), off("A3", 480, velocity=7), 
-        on("C3", 480, velocity=9), off("C3", 480, velocity=9), 
-    ],
-    [
-        on("B3", 0, 1, velocity=7), off("B3", 480, 1, velocity=7), 
-    ]
-]
-test_mini("merged cycles: more voices in mergee", expected, notes("[A3,B3 C3]").velocity("[7 9]"))
+def test_stacked_cycles(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0, 0), off("A3", 320, 0), 
+            on("B3", 320, 0), off("B3", 320, 0), 
+            on("C3", 320, 0), off("C3", 320, 0), 
+            on("A3", 320, 0), off("A3", 320, 0), 
+            on("B3", 320, 0), off("B3", 320, 0), 
+            on("C3", 320, 0), off("C3", 320, 0), 
+        ],
+        [
+            on("A3", 0, 1), off("A3", 240, 1), 
+            on("B3", 240, 1), off("B3", 240, 1), 
+            on("C3", 240, 1), off("C3", 240, 1), 
+            on("D3", 240, 1), off("D3", 240, 1), 
+            on("A4", 240, 1), off("A4", 240, 1), 
+            on("B4", 240, 1), off("B4", 240, 1), 
+            on("C4", 240, 1), off("C4", 240, 1), 
+            on("D4", 240, 1), off("D4", 240, 1), 
+        ]
+    ])
+    actual = notes("[A3 B3 C3]").stack().notes("[A3 B3 C3 D3] [A4 B4 C4 D4]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [
-    [
-        on("A3", 0), off("A3", 480), 
-        on("A3", 480), off("A3", 240), 
-        on("A3", 240), off("A3", 240), 
-        on("B3", 240), off("B3", 480), 
-        on("B3", 480), off("B3", 240), 
-        on("B3", 240), off("B3", 240), 
-    ],
-]
-test_mini("rhythm: monophonic", expected, rhythm("[x [x x]]").notes("[A3] [B3]"))
+def test_merged_cycles(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0, velocity=9), off("A3", 320, velocity=9), 
+            on("B3", 320, velocity=9), off("B3", 320, velocity=9), 
+            on("C3", 320, velocity=5), off("C3", 320, velocity=5), 
+        ],
+    ])
+    actual = notes("[A3 B3 C3]").velocity("[9 9 5]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [
-    [
-        on("A3", 0), off("A3", 480), 
-        on("A3", 480), off("A3", 240), 
-        on("A3", 240), off("A3", 240), 
-        on("B3", 240), off("B3", 480), 
-        on("B3", 480), off("B3", 240), 
-        on("B3", 240), off("B3", 240), 
-    ],
-    [
-        on("C3", 0, 1), off("C3", 480, 1), 
-        on("C3", 480, 1), off("C3", 240, 1), 
-        on("C3", 240, 1), off("C3", 240, 1), 
-        on("D3", 240, 1), off("D3", 480, 1), 
-        on("D3", 480, 1), off("D3", 240, 1), 
-        on("D3", 240, 1), off("D3", 240, 1), 
-    ],
-]
-test_mini("rhythm: polyphonic", expected, rhythm("[x,x [x,x x,x]]").notes("[A3,C3] [B3,D3]"))
+def test_merged_cycles_same_length_different_rhythm(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0, velocity=7), off("A3", 320, velocity=7), 
+            on("B3", 320, velocity=7), off("B3", 320, velocity=7), 
+            on("C3", 320, velocity=8), off("C3", 320, velocity=8), 
+        ],
+    ])
+    actual = notes("[A3 B3 C3]").velocity("[7 8]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [
-    [
-        on("A3", 0), off("A3", 480), 
-        on("A3", 480), off("A3", 240), 
-        on("A3", 240), off("A3", 240), 
-        on("B3", 240), off("B3", 480), 
-        on("B3", 480), off("B3", 240), 
-        on("B3", 240), off("B3", 240), 
-    ],
-    [
-        on("C3", 0, 1), off("C3", 480, 1), 
-        on("C3", 480, 1), off("C3", 240, 1), 
-        on("C3", 240, 1), off("C3", 240, 1), 
-        on("D3", 240, 1), off("D3", 480, 1), 
-        on("D3", 480, 1), off("D3", 240, 1), 
-        on("D3", 240, 1), off("D3", 240, 1), 
-    ],
-]
-test_mini("rhythm: mismatched polyphonic", expected, rhythm("[x [x x]]").notes("[A3,C3] [B3,D3]"))
+def test_merged_cycles_different_length_same_rhythm(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0, velocity=7), off("A3", 960, velocity=7), 
+            on("B3", 960, velocity=8), off("B3", 960, velocity=8), 
+            on("C3", 960, velocity=7), off("C3", 960, velocity=7), 
+            on("A3", 960, velocity=8), off("A3", 960, velocity=8), 
+            on("B3", 960, velocity=7), off("B3", 960, velocity=7), 
+            on("C3", 960, velocity=8), off("C3", 960, velocity=8), 
+        ],
+    ])
+    actual = notes("[A3] [B3] [C3]").velocity("[7] [8]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
-expected = [
-    [
-        on("A3", 0), off("A3", 480), 
-        on("A3", 960), off("A3", 240), 
-        on("B3", 240), off("B3", 480), 
-        on("B3", 960), off("B3", 240), 
-    ],
-]
-test_mini("rhythm: rests", expected, rhythm("[x [~ x]]").notes("[A3] [B3]"))
+def test_more_voices_in_merger(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0, velocity=7), off("A3", 480, velocity=7), 
+            on("C3", 480, velocity=9), off("C3", 480, velocity=9), 
+        ],
+        [
+            on("B3", 0, 1, velocity=8), off("B3", 480, 1, velocity=8), 
+        ]
+    ])
+    actual = notes("[A3,B3 C3]").velocity("[7,8,9 9]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+
+def test_more_voices_in_mergee(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0, velocity=7), off("A3", 480, velocity=7), 
+            on("C3", 480, velocity=9), off("C3", 480, velocity=9), 
+        ],
+        [
+            on("B3", 0, 1, velocity=7), off("B3", 480, 1, velocity=7), 
+        ]
+    ])
+    actual = notes("[A3,B3 C3]").velocity("[7 9]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+def test_rhythm_monophonic(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0), off("A3", 480), 
+            on("A3", 480), off("A3", 240), 
+            on("A3", 240), off("A3", 240), 
+            on("B3", 240), off("B3", 480), 
+            on("B3", 480), off("B3", 240), 
+            on("B3", 240), off("B3", 240), 
+        ],
+    ])
+    actual = rhythm("[x [x x]]").notes("[A3] [B3]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+def test_rhythm_polyphonic(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0), off("A3", 480), 
+            on("A3", 480), off("A3", 240), 
+            on("A3", 240), off("A3", 240), 
+            on("B3", 240), off("B3", 480), 
+            on("B3", 480), off("B3", 240), 
+            on("B3", 240), off("B3", 240), 
+        ],
+        [
+            on("C3", 0, 1), off("C3", 480, 1), 
+            on("C3", 480, 1), off("C3", 240, 1), 
+            on("C3", 240, 1), off("C3", 240, 1), 
+            on("D3", 240, 1), off("D3", 480, 1), 
+            on("D3", 480, 1), off("D3", 240, 1), 
+            on("D3", 240, 1), off("D3", 240, 1), 
+        ],
+    ])
+    actual = rhythm("[x,x [x,x x,x]]").notes("[A3,C3] [B3,D3]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+def test_rhythm_mismatched_polyphonic(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0), off("A3", 480), 
+            on("A3", 480), off("A3", 240), 
+            on("A3", 240), off("A3", 240), 
+            on("B3", 240), off("B3", 480), 
+            on("B3", 480), off("B3", 240), 
+            on("B3", 240), off("B3", 240), 
+        ],
+        [
+            on("C3", 0, 1), off("C3", 480, 1), 
+            on("C3", 480, 1), off("C3", 240, 1), 
+            on("C3", 240, 1), off("C3", 240, 1), 
+            on("D3", 240, 1), off("D3", 480, 1), 
+            on("D3", 480, 1), off("D3", 240, 1), 
+            on("D3", 240, 1), off("D3", 240, 1), 
+        ],
+    ])
+    actual = rhythm("[x [x x]]").notes("[A3,C3] [B3,D3]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+def test_rhythm_mismatched_rests(mid_factory):
+    expected = mid_factory([
+        [
+            on("A3", 0), off("A3", 480), 
+            on("A3", 960), off("A3", 240), 
+            on("B3", 240), off("B3", 480), 
+            on("B3", 960), off("B3", 240), 
+        ],
+    ])
+    actual = rhythm("[x [~ x]]").notes("[A3] [B3]").midi().midi_file
+    assert expected.tracks == actual.tracks
