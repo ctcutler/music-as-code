@@ -1,11 +1,10 @@
 import pytest
 
 from fractions import Fraction
-from pprint import pp
 
 from mido import Message, MidiFile, MidiTrack, MetaMessage
 
-from midi import Config, midi_note_numbers
+from midi import midi_note_numbers
 from minimidi import Cycle, Event, parse_mini, expand_alternatives, generate_events, notes, rhythm
 
 VELOCITY = 5
