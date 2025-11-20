@@ -33,6 +33,8 @@ deactivate
 ```
 mypy --strict cyclemidi.py
 pytest
+ruff check cyclemidi.py
+ruff format cyclemidi.py
 ```
 
 # Philsophy

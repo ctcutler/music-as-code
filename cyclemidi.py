@@ -1,7 +1,8 @@
-from __future__ import annotations # so that Cycles methods can return Cycles instances
+from __future__ import annotations  # so that Cycles methods can return Cycles instances
 from enum import Enum, auto
 from midi import Config
 from typing import Any
+
 
 class CycleStringType(Enum):
     NOTES = auto()
@@ -11,8 +12,8 @@ class CycleStringType(Enum):
     NUDGE = auto()
     STACK = auto()
 
-class Cycles:
 
+class Cycles:
     def __init__(self) -> None:
         self.cycle_strings: list[tuple[CycleStringType, str]] = []
         self.midi_file = None
@@ -57,9 +58,10 @@ class Cycles:
 
         return self
 
+
 def notes(cycle_string: str) -> Cycles:
     return Cycles().notes(cycle_string)
 
+
 def rhythm(cycle_string: str) -> Cycles:
     return Cycles().rhythm(cycle_string)
-
