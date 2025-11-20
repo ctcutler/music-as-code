@@ -4,10 +4,12 @@ import re
 import signal
 import sys
 import time
+from typing import Any
 
-from mido import MidiFile, Message, MetaMessage, open_output, Backend
+from mido import MidiFile, Message, MetaMessage, open_output, Backend # type: ignore
+from mido.ports import BaseOutput # type: ignore
 
-def sigterm_handler(signum, frame):
+def sigterm_handler(signum: int, frame: Any) -> None:
     raise SystemExit("Program terminated by SIGTERM")
 
 signal.signal(signal.SIGTERM, sigterm_handler)
@@ -18,7 +20,7 @@ class Config:
     symbols_per_beat: int = 2 # 2 means each symbol is an 8th note
     note_width: float = .5          
     swing: float = .5               
-    midi_devices: list = field(default_factory=lambda: ["FH-2"]) # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
+    midi_devices: list[str] = field(default_factory=lambda: ["FH-2"]) # Or 'Elektron Model:Cycles' or 'IAC Driver Bus 1'     
     midi_file_name: str = "new_song.mid"
     beats_per_measure: int = 4
 
@@ -46,13 +48,16 @@ midi_note_names = {v: k for (k, v) in midi_note_numbers.items()}
 
 ASCII_NOTE_RE = re.compile('(\D*)(\d+)(\+*)(\-*)')
 
-def get_note_name(number):
+def get_note_name(number: int) -> str:
     octave = (number // 12) - 1
     note = midi_note_names[number - (octave * 12)]
     return f"{note}{octave}"
 
-def get_midi_note_and_velocity(symbol):
+def get_midi_note_and_velocity(symbol: str) -> tuple[int, int]:
     m = ASCII_NOTE_RE.search(symbol)
+    if m is None:
+        raise Exception(f"Failed to parse note {symbol}")
+
     note_name, octave, up_volume, down_volume = m.groups()
     if note_name:
         midi_note = midi_note_numbers[note_name] + (int(octave) * 12)
@@ -65,7 +70,7 @@ def get_midi_note_and_velocity(symbol):
 
     return midi_note, velocity
 
-def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
+def add_clock_messages(note_messages: list[Message], qn_per_minute: int, pulses_per_qn: int) -> list[Message] :
     """
     Takes list of note messages where message.time is the offset in seconds since the previous
     note and returns a new list of note and clock messages where message.time is a 0-based offset
@@ -92,7 +97,7 @@ def add_clock_messages(note_messages, qn_per_minute, pulses_per_qn):
     #all_messages.append(Message('stop', time=all_messages[-1].time))
     return all_messages
 
-def multi_port_play(midi_ports, config, total_secs):
+def multi_port_play(midi_ports: list[BaseOutput], config: Config, total_secs: int) -> None:
     midi_file = MidiFile(config.midi_file_name)
     messages = add_clock_messages(list(midi_file), config.beats_per_minute, 24)
     start_time = time.time()
@@ -131,7 +136,7 @@ def multi_port_play(midi_ports, config, total_secs):
             midi_port.reset()
         sys.exit(1)
 
-def play_midi(config, total_secs):
+def play_midi(config: Config, total_secs: int) -> None:
     # user may pass None 
     if not config.midi_devices:
         return 

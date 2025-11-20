@@ -29,6 +29,12 @@ echo 2025-08-11.py | entr -r python 2025-08-11.py
 deactivate
 ```
 
+# Test/Typecheck
+```
+mypy --strict cyclemidi.py
+pytest
+```
+
 # Philsophy
 - plain text, no special/proprietary data format
 - human readable, especially in a monospaced font
