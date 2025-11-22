@@ -66,6 +66,34 @@ def tokenize(cycle_string: str) -> list[str]:
 
     return tokens
 
+def expand_alternatives(s: str) -> str:
+    """
+    Recursively expands out all alternative cycles by making copies of the whole string
+    starting with the most deeply nested alternative cycles.
+    """
+    start = None
+    end = None
+
+    # find the first complete angle bracket pair, a.k.a. the first one that doesn't
+    # have another nested within it
+    for (i, c) in enumerate(s):
+        if c == "<":
+            start = i
+        elif c == ">":
+            end = i+1
+            break
+
+    if start is not None and end is not None:
+        alternative_cycle = s[start:end]
+        cycle_elements = alternative_cycle.strip("<>").split(" ")
+        copies = [
+            expand_alternatives(f"{s[:start]}{element}{s[end:]}") for element in cycle_elements
+        ]
+        return " ".join(copies)
+    else:
+        return s
+
+
 
 def add_cycle_to_tree(tokens: list[str], tree: TreeNode) -> int:
     """
@@ -123,7 +151,8 @@ def parse_cycle_strings(cycle_strings: list[CycleString]) -> list[Voice]:
             voices.append([])
             base_voice_idx = len(voices) - 1
         elif cycle_string_type == CycleStringType.NOTES:
-            parse_cycles(cycle_string)
+            expanded = expand_alternatives(cycle_string)
+            parse_cycles(expanded)
             # split cycles into notes
             # append notes to voice(s)
 
