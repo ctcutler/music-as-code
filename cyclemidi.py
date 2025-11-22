@@ -5,7 +5,8 @@ from fractions import Fraction
 from enum import Enum, auto
 from midi import Config
 from typing import Any, Union
-
+from string import whitespace
+import re
 
 
 class CycleStringType(Enum):
@@ -16,22 +17,31 @@ class CycleStringType(Enum):
     NUDGE = auto()
     STACK = auto()
 
+
 @dataclass
 class Rest:
-    start:Fraction
-    end:Fraction
+    start: Fraction
+    end: Fraction
+
+
+@dataclass
+class TreeNode:
+    children: list[Union[TreeNode | str]]
+
 
 @dataclass
 class Note:
-    start:Fraction
-    end:Fraction
-    pitch:str
-    velocity:int
-    width:Decimal
-    offset:Decimal
+    start: Fraction
+    end: Fraction
+    pitch: str
+    velocity: int
+    width: Decimal
+    offset: Decimal
+
 
 Voice = list[Union[Note, Rest]]
 CycleString = tuple[CycleStringType, str]
+
 
 class Cycles:
     def __init__(self) -> None:
@@ -40,17 +50,82 @@ class Cycles:
         self.total_secs = None
         self.config = Config()
 
-
     # "private" methods
+    def _tokenize(self, cycle_string: str) -> list[str]:
+        tokens = []
+        cur_token = ""
+        for c in cycle_string:
+            if c not in whitespace + "[]":
+                cur_token += c
+            else:
+                if cur_token != "":
+                    tokens.append(cur_token)
+                    cur_token = ""
+                if c in "[]":
+                    tokens.append(c)
+
+        if cur_token != "":
+            tokens.append(cur_token)
+
+        return tokens
+
+    def _add_cycle_to_tree(self, tokens: list[str], tree: TreeNode) -> int:
+        """
+        Adds the tokens of a single (potentially nested) cycle into an
+        existing tree.
+        """
+        i = 0
+        token_count = len(tokens)
+        while i < token_count:
+            token = tokens[i]
+            if token == "[":  # this is subtree's open brackent
+                subtree = TreeNode([])
+                tokens_consumed = self._add_cycle_to_tree(tokens[i + 1 :], subtree)
+                tree.children.append(subtree)
+                i += tokens_consumed + 1
+            elif token == "]":  # this  is tree's close bracket
+                return i
+            else:
+                tree.children.append(token)
+                i += 1
+
+        raise Exception(f"{tokens} has mismatched brackets")
+
+    def _parse_cycles(self, cycle_string: str) -> list[str]:
+        """
+        So:
+        - treeify
+        - count elements at current level
+        - for each element at current level:
+          - if leaf:
+            set length
+          - if node:
+            recurse
+        """
+        cycle_tree = TreeNode([])
+
+        # the top level is a list of one or more cycles that we need to split up
+        # and parse into the same tree
+        cycles = re.split(r"(?<=\])\s*(?=\[)", cycle_string)
+        for cycle in cycles:
+            tokens = self._tokenize(cycle)
+            self._add_cycle_to_tree(tokens, cycle_tree)
+
+        print(cycle_tree)
+
+        return []
+
     def _parse_cycle_strings(self, cycle_strings: list[CycleString]) -> list[Voice]:
         voices: list[Voice] = [[]]
         base_voice_idx = 0
-        for (cycle_string_type, cycle_string) in cycle_strings:
+        for cycle_string_type, cycle_string in cycle_strings:
             if cycle_string_type == CycleStringType.STACK:
                 voices.append([])
                 base_voice_idx = len(voices) - 1
             elif cycle_string_type == CycleStringType.NOTES:
-                pass
+                self._parse_cycles(cycle_string)
+                # split cycles into notes
+                # append notes to voice(s)
 
         return voices
 
