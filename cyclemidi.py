@@ -4,7 +4,7 @@ from decimal import Decimal
 from fractions import Fraction
 from enum import Enum, auto
 from midi import Config
-from typing import Any, Union
+from typing import Any, Union, Optional
 from string import whitespace
 import re
 
@@ -19,12 +19,6 @@ class CycleStringType(Enum):
 
 
 @dataclass
-class Rest:
-    start: Fraction
-    end: Fraction
-
-
-@dataclass
 class TreeNode:
     children: list[Union[TreeNode | str]]
 
@@ -33,13 +27,13 @@ class TreeNode:
 class Note:
     start: Fraction
     end: Fraction
-    pitch: str
-    velocity: int
-    width: Decimal
-    offset: Decimal
+    pitch: Optional[str] = None
+    velocity: Optional[int] = None
+    width: Optional[Decimal] = None
+    offset: Optional[Decimal] = None
 
 
-Voice = list[Union[Note, Rest]]
+Voice = list[Note]
 CycleString = tuple[CycleStringType, str]
 
 ###
@@ -49,6 +43,9 @@ CycleString = tuple[CycleStringType, str]
 
 
 def tokenize(cycle_string: str) -> list[str]:
+    """
+    Tokenizes a cycle string into "[", "]", and continguous non-whitespace tokens.
+    """
     tokens = []
     cur_token = ""
     for c in cycle_string:
@@ -93,8 +90,6 @@ def expand_alternatives(s: str) -> str:
     else:
         return s
 
-
-
 def add_cycle_to_tree(tokens: list[str], tree: TreeNode) -> int:
     """
     Adds the tokens of a single (potentially nested) cycle into an
@@ -117,8 +112,69 @@ def add_cycle_to_tree(tokens: list[str], tree: TreeNode) -> int:
 
     raise Exception(f"{tokens} has mismatched brackets")
 
+def split_cycles(cycle_string: str) -> list[str]:
+    """
+    The top level cycle string is a list of one or more cycles that we need to split up
+    and parse into the same tree.
 
-def parse_cycles(cycle_string: str) -> list[str]:
+    Lookahead and lookbehind groups ensure we preserve the brackets even while splitting 
+    on them.
+    """
+    return re.split(r"(?<=\])\s*(?=\[)", cycle_string)
+
+def build_cycle_tree(cycles: list[str]) -> TreeNode:
+    cycle_tree = TreeNode([])
+
+    for cycle in cycles:
+        tokens = tokenize(cycle)
+        add_cycle_to_tree(tokens, cycle_tree)
+
+    return cycle_tree
+
+def z(l: list[Any]) -> list[Any]:
+    """
+    Helper that avoids repeating list(zip(*some_list)) a billion times.
+    """
+    return [list(x) for x in zip(*l)]
+
+def extend_voices(l: list[Voice], r: list[Voice]) -> list[Voice]:
+    return z(z(l) + z(r))
+
+def generate_notes(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice]:
+    """
+    In-order traversal of tree, generating a Note object for every
+    leaf node with start and end set based on the provided start, end, and the number of
+    child nodes.
+
+    """
+    [
+            (
+                Note(start=Fraction(0, 1), end=Fraction(1, 3), pitch=None, velocity=None, width=None, offset=None),
+                Note(start=Fraction(1, 3), end=Fraction(2, 3), pitch=None, velocity=None, width=None, offset=None),
+                Note(start=Fraction(2, 3), end=Fraction(1, 1), pitch=None, velocity=None, width=None, offset=None)
+            )
+    ]
+    voices: list[Voice] = [[]]
+    child_count = len(tree.children)
+    increment = Fraction((end - start) / child_count)
+
+    print(tree)
+    for (i, child) in enumerate(tree.children):
+        # all time ranges are start-inclusive and end-exclusive.
+        child_start = i * increment
+        child_end = (i + 1) * increment
+
+        if isinstance(child, TreeNode):
+            child_voices = generate_notes(child, child_start, child_end)
+            # TODO add polyphony support, e.g. mismatched numbers of voices
+            voices = extend_voices(voices, child_voices)
+        else:
+            # TODO add polyphony support
+            voices[0].append(Note(child_start, child_end))
+
+    return voices
+
+def parse_cycles(cycle_string: str) -> list[Voice]:
     """
     So:
     - treeify
@@ -129,18 +185,16 @@ def parse_cycles(cycle_string: str) -> list[str]:
       - if node:
         recurse
     """
-    cycle_tree = TreeNode([])
+    expanded = expand_alternatives(cycle_string)
+    cycles = split_cycles(expanded)
+    cycle_tree = build_cycle_tree(cycles)
+    notes = generate_notes(
+        cycle_tree, Fraction(0), Fraction(len(cycle_tree.children))
+    )
 
-    # the top level is a list of one or more cycles that we need to split up
-    # and parse into the same tree
-    cycles = re.split(r"(?<=\])\s*(?=\[)", cycle_string)
-    for cycle in cycles:
-        tokens = tokenize(cycle)
-        add_cycle_to_tree(tokens, cycle_tree)
+    print(notes)
 
-    print(cycle_tree)
-
-    return []
+    return notes
 
 
 def parse_cycle_strings(cycle_strings: list[CycleString]) -> list[Voice]:
@@ -151,8 +205,7 @@ def parse_cycle_strings(cycle_strings: list[CycleString]) -> list[Voice]:
             voices.append([])
             base_voice_idx = len(voices) - 1
         elif cycle_string_type == CycleStringType.NOTES:
-            expanded = expand_alternatives(cycle_string)
-            parse_cycles(expanded)
+            parse_cycles(cycle_string)
             # split cycles into notes
             # append notes to voice(s)
 
