@@ -1,7 +1,11 @@
 from __future__ import annotations  # so that Cycles methods can return Cycles instances
+from dataclasses import dataclass
+from decimal import Decimal
+from fractions import Fraction
 from enum import Enum, auto
 from midi import Config
-from typing import Any
+from typing import Any, Union
+
 
 
 class CycleStringType(Enum):
@@ -12,14 +16,48 @@ class CycleStringType(Enum):
     NUDGE = auto()
     STACK = auto()
 
+@dataclass
+class Rest:
+    start:Fraction
+    end:Fraction
+
+@dataclass
+class Note:
+    start:Fraction
+    end:Fraction
+    pitch:str
+    velocity:int
+    width:Decimal
+    offset:Decimal
+
+Voice = list[Union[Note, Rest]]
+CycleString = tuple[CycleStringType, str]
 
 class Cycles:
     def __init__(self) -> None:
-        self.cycle_strings: list[tuple[CycleStringType, str]] = []
+        self.cycle_strings: list[CycleString] = []
         self.midi_file = None
         self.total_secs = None
         self.config = Config()
 
+
+    # "private" methods
+    def _parse_cycle_strings(self, cycle_strings: list[CycleString]) -> list[Voice]:
+        voices: list[Voice] = [[]]
+        base_voice_idx = 0
+        for (cycle_string_type, cycle_string) in cycle_strings:
+            if cycle_string_type == CycleStringType.STACK:
+                voices.append([])
+                base_voice_idx = len(voices) - 1
+            elif cycle_string_type == CycleStringType.NOTES:
+                pass
+
+        return voices
+
+    def _generate_midi(self, voices: list[Voice]) -> None:
+        pass
+
+    # "public" methods
     def notes(self, cycle_string: str) -> Cycles:
         self.cycle_strings.append((CycleStringType.NOTES, cycle_string))
         return self
@@ -49,7 +87,8 @@ class Cycles:
         return self
 
     def midi(self) -> Cycles:
-        # (self.midi_file, self.total_secs) = events_to_midi(voices, self.config, cycle_count)
+        voices = self._parse_cycle_strings(self.cycle_strings)
+        self._generate_midi(voices)
 
         return self
 
