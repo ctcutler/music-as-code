@@ -63,6 +63,7 @@ def tokenize(cycle_string: str) -> list[str]:
 
     return tokens
 
+
 def expand_alternatives(s: str) -> str:
     """
     Recursively expands out all alternative cycles by making copies of the whole string
@@ -73,22 +74,24 @@ def expand_alternatives(s: str) -> str:
 
     # find the first complete angle bracket pair, a.k.a. the first one that doesn't
     # have another nested within it
-    for (i, c) in enumerate(s):
+    for i, c in enumerate(s):
         if c == "<":
             start = i
         elif c == ">":
-            end = i+1
+            end = i + 1
             break
 
     if start is not None and end is not None:
         alternative_cycle = s[start:end]
         cycle_elements = alternative_cycle.strip("<>").split(" ")
         copies = [
-            expand_alternatives(f"{s[:start]}{element}{s[end:]}") for element in cycle_elements
+            expand_alternatives(f"{s[:start]}{element}{s[end:]}")
+            for element in cycle_elements
         ]
         return " ".join(copies)
     else:
         return s
+
 
 def add_cycle_to_tree(tokens: list[str], tree: TreeNode) -> int:
     """
@@ -112,15 +115,17 @@ def add_cycle_to_tree(tokens: list[str], tree: TreeNode) -> int:
 
     raise Exception(f"{tokens} has mismatched brackets")
 
+
 def split_cycles(cycle_string: str) -> list[str]:
     """
     The top level cycle string is a list of one or more cycles that we need to split up
     and parse into the same tree.
 
-    Lookahead and lookbehind groups ensure we preserve the brackets even while splitting 
+    Lookahead and lookbehind groups ensure we preserve the brackets even while splitting
     on them.
     """
     return re.split(r"(?<=\])\s*(?=\[)", cycle_string)
+
 
 def build_cycle_tree(cycles: list[str]) -> TreeNode:
     cycle_tree = TreeNode([])
@@ -131,14 +136,17 @@ def build_cycle_tree(cycles: list[str]) -> TreeNode:
 
     return cycle_tree
 
-def z(l: list[Any]) -> list[Any]:
+
+def z(L: list[Any]) -> list[Any]:
     """
     Helper that avoids repeating list(zip(*some_list)) a billion times.
     """
-    return [list(x) for x in zip(*l)]
+    return [list(x) for x in zip(*L)]
 
-def extend_voices(l: list[Voice], r: list[Voice]) -> list[Voice]:
-    return z(z(l) + z(r))
+
+def extend_voices(L: list[Voice], R: list[Voice]) -> list[Voice]:
+    return z(z(L) + z(R))
+
 
 def generate_notes(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice]:
     """
@@ -147,19 +155,12 @@ def generate_notes(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice
     child nodes.
 
     """
-    [
-            (
-                Note(start=Fraction(0, 1), end=Fraction(1, 3), pitch=None, velocity=None, width=None, offset=None),
-                Note(start=Fraction(1, 3), end=Fraction(2, 3), pitch=None, velocity=None, width=None, offset=None),
-                Note(start=Fraction(2, 3), end=Fraction(1, 1), pitch=None, velocity=None, width=None, offset=None)
-            )
-    ]
     voices: list[Voice] = [[]]
     child_count = len(tree.children)
     increment = Fraction((end - start) / child_count)
 
     print(tree)
-    for (i, child) in enumerate(tree.children):
+    for i, child in enumerate(tree.children):
         # all time ranges are start-inclusive and end-exclusive.
         child_start = i * increment
         child_end = (i + 1) * increment
@@ -173,6 +174,7 @@ def generate_notes(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice
             voices[0].append(Note(child_start, child_end))
 
     return voices
+
 
 def parse_cycles(cycle_string: str) -> list[Voice]:
     """
@@ -188,9 +190,7 @@ def parse_cycles(cycle_string: str) -> list[Voice]:
     expanded = expand_alternatives(cycle_string)
     cycles = split_cycles(expanded)
     cycle_tree = build_cycle_tree(cycles)
-    notes = generate_notes(
-        cycle_tree, Fraction(0), Fraction(len(cycle_tree.children))
-    )
+    notes = generate_notes(cycle_tree, Fraction(0), Fraction(len(cycle_tree.children)))
 
     print(notes)
 
