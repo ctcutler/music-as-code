@@ -30,7 +30,7 @@ class TreeNode:
 class Note:
     start: Fraction
     end: Fraction
-    pitch: Optional[str] = None
+    pitch: str = ""
     velocity: Optional[int] = None
     width: Optional[Decimal] = None
     offset: Optional[Decimal] = None
@@ -226,7 +226,7 @@ def generate_midi(
         prev_note_end: float = 0  # contains _absolute_ time of prev note's note_off
         for note in voice:
             # don't update prev_note_end or append Messages for rest events
-            if note.pitch is not None:
+            if note.pitch != "~":
                 note_duration = (note.end - note.start) * config.note_width
                 midi_note, velocity = get_midi_note_and_velocity(note.pitch)
                 if note.velocity is not None:
