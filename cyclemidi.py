@@ -235,6 +235,8 @@ def generate_voices(
                 note = Note(child_start, child_end)
                 if cycle_list_type == CycleListType.NOTES:
                     note.pitch = note_value
+                elif cycle_list_type == CycleListType.RHYTHM:
+                    pass  # start and end are already set
                 elif cycle_list_type == CycleListType.VELOCITY:
                     velocity = int(note_value)
                     assert velocity >= 0 and velocity <= 9
@@ -244,22 +246,49 @@ def generate_voices(
     return voices
 
 
+def merge_note(
+    left_note: Note, right_note: Note, cycle_list_type: CycleListType
+) -> Note:
+    # TODO add other cycle list types
+    if cycle_list_type == CycleListType.VELOCITY:
+        assert left_note.velocity is None
+        return replace(left_note, velocity=right_note.velocity)
+    elif cycle_list_type == CycleListType.NOTES:
+        assert left_note.pitch == ""
+        return replace(left_note, pitch=right_note.pitch)
+
+    raise Exception(f"Unexpected cycle list type: {cycle_list_type}")
+
+
 def merge_voice(
     left_voice: Voice, right_voice: Voice, cycle_list_type: CycleListType
 ) -> Voice:
     if len(left_voice) == 0:
         return right_voice
 
-    # TODO: for now assuming left_voice annd right_voice have same number of notes
+    # merging rhythm into anything else is not supported, it must come first
+    assert cycle_list_type != CycleListType.RHYTHM
+
+    right_i = 0
+    left_i = 0
     new_voice = []
-    for i, right_note in enumerate(right_voice):
-        left_note = left_voice[i]
-        if cycle_list_type == CycleListType.VELOCITY:
-            assert left_note.velocity is None
-            new_voice.append(replace(left_note, velocity=right_note.velocity))
-        elif cycle_list_type == CycleListType.NOTES:
-            assert left_note.pitch == ""
-            new_voice.append(replace(left_note, pitch=right_note.pitch))
+    while right_i < len(right_voice) and left_i < len(left_voice):
+        right_note = right_voice[right_i]
+        left_note = left_voice[left_i]
+
+        # right starts after left starts: no merge, inc. left
+        if right_note.start > left_note.start:
+            left_i += 1
+        # right ends before (or at) left start: no merge, inc. right
+        elif right_note.end <= left_note.start:
+            right_i += 1
+        # right spans left start: merge
+        else:
+            new_note = merge_note(left_note, right_note, cycle_list_type)
+            new_voice.append(new_note)
+
+            # always increment left here because we've merged into it
+            left_i += 1
 
     return new_voice
 
