@@ -13,7 +13,7 @@ from mido import MidiFile, bpm2tempo, tick2second, MidiTrack, Message, MetaMessa
 from midi import get_midi_note_and_velocity, play_midi, Config
 
 
-class CycleStringType(Enum):
+class CycleListType(Enum):
     NOTES = auto()
     RHYTHM = auto()
     VELOCITY = auto()
@@ -38,7 +38,7 @@ class Note:
 
 
 Voice = list[Note]
-CycleString = tuple[CycleStringType, str]
+CycleList = tuple[CycleListType, str]
 
 ###
 # Note: the public interface (`Cycles`) is object-orented and "fluent" but the actual processing is done
@@ -46,13 +46,13 @@ CycleString = tuple[CycleStringType, str]
 ###
 
 
-def tokenize(cycle_string: str) -> list[str]:
+def tokenize(cycle_list: str) -> list[str]:
     """
-    Tokenizes a cycle string into "[", "]", and continguous non-whitespace tokens.
+    Tokenizes a cycle list into "[", "]", and continguous non-whitespace tokens.
     """
     tokens = []
     cur_token = ""
-    for c in cycle_string:
+    for c in cycle_list:
         if c not in whitespace + "[]":
             cur_token += c
         else:
@@ -120,15 +120,15 @@ def add_cycle_to_tree(tokens: list[str], tree: TreeNode) -> int:
     raise Exception(f"{tokens} has mismatched brackets")
 
 
-def split_cycles(cycle_string: str) -> list[str]:
+def split_cycles(cycle_list: str) -> list[str]:
     """
-    The top level cycle string is a list of one or more cycles that we need to split up
+    The top level cycle list is a list of one or more cycles that we need to split up
     and parse into the same tree.
 
     Lookahead and lookbehind groups ensure we preserve the brackets even while splitting
     on them.
     """
-    return re.split(r"(?<=\])\s*(?=\[)", cycle_string)
+    return re.split(r"(?<=\])\s*(?=\[)", cycle_list)
 
 
 def build_cycle_tree(cycles: list[str]) -> TreeNode:
@@ -225,8 +225,8 @@ def generate_voices(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voic
     return voices
 
 
-def parse_cycles(cycle_string: str) -> tuple[list[Voice], int]:
-    expanded = expand_alternatives(cycle_string)
+def parse_cycles(cycle_list: str) -> tuple[list[Voice], int]:
+    expanded = expand_alternatives(cycle_list)
     cycles = split_cycles(expanded)
     cycle_tree = build_cycle_tree(cycles)
     cycle_count = len(cycle_tree.children)
@@ -235,17 +235,17 @@ def parse_cycles(cycle_string: str) -> tuple[list[Voice], int]:
     return (voices, cycle_count)
 
 
-def parse_cycle_strings(cycle_strings: list[CycleString]) -> tuple[list[Voice], int]:
+def parse_cycle_lists(cycle_lists: list[CycleList]) -> tuple[list[Voice], int]:
     voices: list[Voice] = [[]]
     base_voice_idx = 0
     max_cycle_count = 0
-    for cycle_string_type, cycle_string in cycle_strings:
-        if cycle_string_type == CycleStringType.STACK:
+    for cycle_list_type, cycle_list in cycle_lists:
+        if cycle_list_type == CycleListType.STACK:
             voices.append([])
             base_voice_idx = len(voices) - 1
-        elif cycle_string_type == CycleStringType.NOTES:
+        elif cycle_list_type == CycleListType.NOTES:
             # TODO: add voice merging, voice count protection
-            (new_voices, cycle_count) = parse_cycles(cycle_string)
+            (new_voices, cycle_count) = parse_cycles(cycle_list)
             voices[base_voice_idx:] = new_voices
             max_cycle_count = max(cycle_count, max_cycle_count)
 
@@ -313,34 +313,34 @@ def generate_midi(
 
 class Cycles:
     def __init__(self) -> None:
-        self.cycle_strings: list[CycleString] = []
+        self.cycle_lists: list[CycleList] = []
         self.midi_file: Optional[MidiFile] = None
         self.total_secs: int = 0
         self.config: Config = Config()
 
     # "public" methods
-    def notes(self, cycle_string: str) -> Cycles:
-        self.cycle_strings.append((CycleStringType.NOTES, cycle_string))
+    def notes(self, cycle_list: str) -> Cycles:
+        self.cycle_lists.append((CycleListType.NOTES, cycle_list))
         return self
 
-    def rhythm(self, cycle_string: str) -> Cycles:
-        self.cycle_strings.append((CycleStringType.RHYTHM, cycle_string))
+    def rhythm(self, cycle_list: str) -> Cycles:
+        self.cycle_lists.append((CycleListType.RHYTHM, cycle_list))
         return self
 
-    def velocity(self, cycle_string: str) -> Cycles:
-        self.cycle_strings.append((CycleStringType.VELOCITY, cycle_string))
+    def velocity(self, cycle_list: str) -> Cycles:
+        self.cycle_lists.append((CycleListType.VELOCITY, cycle_list))
         return self
 
-    def gate_length(self, cycle_string: str) -> Cycles:
-        self.cycle_strings.append((CycleStringType.GATE_LENGTH, cycle_string))
+    def gate_length(self, cycle_list: str) -> Cycles:
+        self.cycle_lists.append((CycleListType.GATE_LENGTH, cycle_list))
         return self
 
-    def nudge(self, cycle_string: str) -> Cycles:
-        self.cycle_strings.append((CycleStringType.NUDGE, cycle_string))
+    def nudge(self, cycle_list: str) -> Cycles:
+        self.cycle_lists.append((CycleListType.NUDGE, cycle_list))
         return self
 
     def stack(self) -> Cycles:
-        self.cycle_strings.append((CycleStringType.STACK, ""))
+        self.cycle_lists.append((CycleListType.STACK, ""))
         return self
 
     def set_config(self, param: str, val: Any) -> Cycles:
@@ -348,7 +348,7 @@ class Cycles:
         return self
 
     def midi(self) -> Cycles:
-        (voices, cycle_count) = parse_cycle_strings(self.cycle_strings)
+        (voices, cycle_count) = parse_cycle_lists(self.cycle_lists)
         (self.midi_file, self.total_secs) = generate_midi(
             voices, self.config, cycle_count
         )
@@ -361,9 +361,9 @@ class Cycles:
         return self
 
 
-def notes(cycle_string: str) -> Cycles:
-    return Cycles().notes(cycle_string)
+def notes(cycle_list: str) -> Cycles:
+    return Cycles().notes(cycle_list)
 
 
-def rhythm(cycle_string: str) -> Cycles:
-    return Cycles().rhythm(cycle_string)
+def rhythm(cycle_list: str) -> Cycles:
+    return Cycles().rhythm(cycle_list)
