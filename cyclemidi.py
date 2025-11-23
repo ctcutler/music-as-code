@@ -162,12 +162,11 @@ def extend_voices(left: list[Voice], right: list[Voice]) -> list[Voice]:
     return [left[i] + right[i] for i in range(len(left))]
 
 
-def normalize_voice_length(voices: list[Voice]) -> list[Voice]:
+def calc_voice_lengths(voices: list[Voice]) -> list[int]:
     """
     Takes a list of voices (potentially) containing different numbers of cycles.
     Uses the fact that the start and end values of Notes are Fractions of cycle
-    counts to determine how long (in cycles) each voice is and how to evenly
-    multiply the shorter ones out until they are all the same length.
+    counts to determine how long (in cycles) each voice is.
     """
     voice_lengths = []
     for voice in voices:
@@ -185,7 +184,22 @@ def normalize_voice_length(voices: list[Voice]) -> list[Voice]:
         else:
             voice_lengths.append(idx + 1)
 
-    desired_voice_length = lcm(*voice_lengths)
+    return voice_lengths
+
+
+def calc_desired_voice_length(voices: list[Voice]) -> int:
+    """
+    Uses the results of calc_voice_lengths to figure out how to evenly
+    multiply the shorter ones out until they are all the same length.
+    """
+    voice_lengths = calc_voice_lengths(voices)
+    return lcm(*voice_lengths)
+
+
+def normalize_voice_length(
+    voices: list[Voice], desired_voice_length: int
+) -> list[Voice]:
+    voice_lengths = calc_voice_lengths(voices)
 
     new_voices = []
     for i, voice in enumerate(voices):
@@ -263,8 +277,8 @@ def merge_note(
 def merge_voice(
     left_voice: Voice, right_voice: Voice, cycle_list_type: CycleListType
 ) -> Voice:
-    if len(left_voice) == 0:
-        return right_voice
+    # we should only get here if there's something to merge into
+    assert len(left_voice) > 0
 
     # merging rhythm into anything else is not supported, it must come first
     assert cycle_list_type != CycleListType.RHYTHM
@@ -316,22 +330,31 @@ def parse_cycle_lists(cycle_lists: list[CycleList]) -> tuple[list[Voice], int]:
             voices.append([])
             base_voice_idx = len(voices) - 1
         else:
-            # TODO: add voice merging, voice count protection
             (new_voices, cycle_count) = parse_cycles(cycle_list, cycle_list_type)
             existing_voices = voices[base_voice_idx:]
-            (existing_voices, new_voices) = normalize_voice_counts(
-                existing_voices, new_voices
-            )
-            assert len(existing_voices) == len(new_voices)
-            merged_voices = [
-                merge_voice(existing_voices[i], new_voices[i], cycle_list_type)
-                for i in range(len(new_voices))
-            ]
-            voices[base_voice_idx:] = merged_voices
-            # voices[base_voice_idx:] = new_voices
+            if existing_voices == [[]]:  # nothing to merge into
+                voices[base_voice_idx:] = new_voices
+            else:
+                (existing_voices, new_voices) = normalize_voice_counts(
+                    existing_voices, new_voices
+                )
+                assert len(existing_voices) == len(new_voices)
+                desired_voice_length = calc_desired_voice_length(
+                    existing_voices + new_voices
+                )
+                existing_voices = normalize_voice_length(
+                    existing_voices, desired_voice_length
+                )
+                new_voices = normalize_voice_length(new_voices, desired_voice_length)
+                merged_voices = [
+                    merge_voice(existing_voices[i], new_voices[i], cycle_list_type)
+                    for i in range(len(new_voices))
+                ]
+                voices[base_voice_idx:] = merged_voices
             max_cycle_count = max(cycle_count, max_cycle_count)
 
-    voices = normalize_voice_length(voices)
+    desired_voice_length = calc_desired_voice_length(voices)
+    voices = normalize_voice_length(voices, desired_voice_length)
 
     return (voices, max_cycle_count)
 
