@@ -164,8 +164,8 @@ def generate_voices(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voic
 
     for i, child in enumerate(tree.children):
         # all time ranges are start-inclusive and end-exclusive.
-        child_start = i * increment
-        child_end = (i + 1) * increment
+        child_start = start + (i * increment)
+        child_end = start + ((i + 1) * increment)
 
         if isinstance(child, TreeNode):
             child_voices = generate_voices(child, child_start, child_end)
