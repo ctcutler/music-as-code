@@ -141,15 +141,23 @@ def build_cycle_tree(cycles: list[str]) -> TreeNode:
     return cycle_tree
 
 
-def extend_voices(left: list[Voice], right: list[Voice]) -> list[Voice]:
-    missing_voice_count = len(left) - len(right)
-    if missing_voice_count != 0:
-        for i in range(abs(missing_voice_count)):
-            if missing_voice_count > 0:
-                right.append([])
-            else:
-                left.append([])
+def normalize_voice_counts(
+    left: list[Voice], right: list[Voice]
+) -> tuple[list[Voice], list[Voice]]:
+    left_len = len(left)
+    right_len = len(right)
+    max_voice_count = max(left_len, right_len)
+    new_left = []
+    new_right = []
+    for i in range(max_voice_count):
+        new_left.append([] if i >= left_len else left[i])
+        new_right.append([] if i >= right_len else right[i])
 
+    return (new_left, new_right)
+
+
+def extend_voices(left: list[Voice], right: list[Voice]) -> list[Voice]:
+    (left, right) = normalize_voice_counts(left, right)
     assert len(left) == len(right)
     return [left[i] + right[i] for i in range(len(left))]
 
@@ -193,7 +201,9 @@ def normalize_voice_length(voices: list[Voice]) -> list[Voice]:
     return new_voices
 
 
-def generate_voices(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice]:
+def generate_voices(
+    tree: TreeNode, start: Fraction, end: Fraction, cycle_list_type: CycleListType
+) -> list[Voice]:
     """
     In-order traversal of tree, generating a Note object for every
     leaf node with start and end set based on the provided start, end, and the number of
@@ -210,27 +220,60 @@ def generate_voices(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voic
         child_end = start + ((i + 1) * increment)
 
         if isinstance(child, TreeNode):
-            child_voices = generate_voices(child, child_start, child_end)
+            child_voices = generate_voices(
+                child, child_start, child_end, cycle_list_type
+            )
             voices = extend_voices(voices, child_voices)
         else:
-            # TODO add support for setting velocity, width, offset
-            pitches = child.split(",")
-            missing_voice_count = len(pitches) - len(voices)
+            # TODO add support for setting width, offset
+            note_values = child.split(",")
+            missing_voice_count = len(note_values) - len(voices)
             if missing_voice_count > 0:
                 for i in range(missing_voice_count):
                     voices.append([])
-            for i, pitch in enumerate(pitches):
-                voices[i].append(Note(child_start, child_end, pitch))
+            for i, note_value in enumerate(note_values):
+                note = Note(child_start, child_end)
+                if cycle_list_type == CycleListType.NOTES:
+                    note.pitch = note_value
+                elif cycle_list_type == CycleListType.VELOCITY:
+                    velocity = int(note_value)
+                    assert velocity >= 0 and velocity <= 9
+                    note.velocity = int((velocity / 9) * 127)
+                voices[i].append(note)
 
     return voices
 
 
-def parse_cycles(cycle_list: str) -> tuple[list[Voice], int]:
+def merge_voice(
+    left_voice: Voice, right_voice: Voice, cycle_list_type: CycleListType
+) -> Voice:
+    if len(left_voice) == 0:
+        return right_voice
+
+    # TODO: for now assuming left_voice annd right_voice have same number of notes
+    new_voice = []
+    for i, right_note in enumerate(right_voice):
+        left_note = left_voice[i]
+        if cycle_list_type == CycleListType.VELOCITY:
+            assert left_note.velocity is None
+            new_voice.append(replace(left_note, velocity=right_note.velocity))
+        elif cycle_list_type == CycleListType.NOTES:
+            assert left_note.pitch == ""
+            new_voice.append(replace(left_note, pitch=right_note.pitch))
+
+    return new_voice
+
+
+def parse_cycles(
+    cycle_list: str, cycle_list_type: CycleListType
+) -> tuple[list[Voice], int]:
     expanded = expand_alternatives(cycle_list)
     cycles = split_cycles(expanded)
     cycle_tree = build_cycle_tree(cycles)
     cycle_count = len(cycle_tree.children)
-    voices = generate_voices(cycle_tree, Fraction(0), Fraction(cycle_count))
+    voices = generate_voices(
+        cycle_tree, Fraction(0), Fraction(cycle_count), cycle_list_type
+    )
 
     return (voices, cycle_count)
 
@@ -243,10 +286,20 @@ def parse_cycle_lists(cycle_lists: list[CycleList]) -> tuple[list[Voice], int]:
         if cycle_list_type == CycleListType.STACK:
             voices.append([])
             base_voice_idx = len(voices) - 1
-        elif cycle_list_type == CycleListType.NOTES:
+        else:
             # TODO: add voice merging, voice count protection
-            (new_voices, cycle_count) = parse_cycles(cycle_list)
-            voices[base_voice_idx:] = new_voices
+            (new_voices, cycle_count) = parse_cycles(cycle_list, cycle_list_type)
+            existing_voices = voices[base_voice_idx:]
+            (existing_voices, new_voices) = normalize_voice_counts(
+                existing_voices, new_voices
+            )
+            assert len(existing_voices) == len(new_voices)
+            merged_voices = [
+                merge_voice(existing_voices[i], new_voices[i], cycle_list_type)
+                for i in range(len(new_voices))
+            ]
+            voices[base_voice_idx:] = merged_voices
+            # voices[base_voice_idx:] = new_voices
             max_cycle_count = max(cycle_count, max_cycle_count)
 
     voices = normalize_voice_length(voices)
