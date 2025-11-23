@@ -141,15 +141,17 @@ def build_cycle_tree(cycles: list[str]) -> TreeNode:
     return cycle_tree
 
 
-def z(L: list[Any]) -> list[Any]:
-    """
-    Helper that avoids repeating list(zip(*some_list)) a billion times.
-    """
-    return [list(x) for x in zip(*L)]
+def extend_voices(left: list[Voice], right: list[Voice]) -> list[Voice]:
+    missing_voice_count = len(left) - len(right)
+    if missing_voice_count != 0:
+        for i in range(abs(missing_voice_count)):
+            if missing_voice_count > 0:
+                right.append([])
+            else:
+                left.append([])
 
-
-def extend_voices(L: list[Voice], R: list[Voice]) -> list[Voice]:
-    return z(z(L) + z(R))
+    assert len(left) == len(right)
+    return [left[i] + right[i] for i in range(len(left))]
 
 
 def normalize_voice_length(voices: list[Voice]) -> list[Voice]:
@@ -209,12 +211,16 @@ def generate_voices(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voic
 
         if isinstance(child, TreeNode):
             child_voices = generate_voices(child, child_start, child_end)
-            # TODO add polyphony support, e.g. mismatched numbers of voices
             voices = extend_voices(voices, child_voices)
         else:
-            # TODO add polyphony support
             # TODO add support for setting velocity, width, offset
-            voices[0].append(Note(child_start, child_end, child))
+            pitches = child.split(",")
+            missing_voice_count = len(pitches) - len(voices)
+            if missing_voice_count > 0:
+                for i in range(missing_voice_count):
+                    voices.append([])
+            for i, pitch in enumerate(pitches):
+                voices[i].append(Note(child_start, child_end, pitch))
 
     return voices
 
