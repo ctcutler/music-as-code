@@ -1,10 +1,11 @@
 from __future__ import annotations  # so that Cycles methods can return Cycles instances
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from fractions import Fraction
 from enum import Enum, auto
 from typing import Any, Union, Optional
 from string import whitespace
+from math import lcm, floor
 import re
 
 from mido import MidiFile, bpm2tempo, tick2second, MidiTrack, Message, MetaMessage  # type: ignore
@@ -151,6 +152,45 @@ def extend_voices(L: list[Voice], R: list[Voice]) -> list[Voice]:
     return z(z(L) + z(R))
 
 
+def normalize_voice_length(voices: list[Voice]) -> list[Voice]:
+    """
+    Takes a list of voices (potentially) containing different numbers of cycles.
+    Uses the fact that the start and end values of Notes are Fractions of cycle
+    counts to determine how long (in cycles) each voice is and how to evenly
+    multiply the shorter ones out until they are all the same length.
+    """
+    voice_lengths = []
+    for voice in voices:
+        assert len(voice) > 0  # we don't expect any empty voices
+
+        note = voice[-1]
+        idx = floor(note.end)
+
+        # Our method gets the index of the last cycle so normally we have to
+        # add one to get the count of cycles.  However, if the end of the last
+        # note coincides with a cycle boundary, it will be an integer that is
+        # the index of the *next* cycle so no need to add one.
+        if note.end.denominator == 1:
+            voice_lengths.append(idx)
+        else:
+            voice_lengths.append(idx + 1)
+
+    desired_voice_length = lcm(*voice_lengths)
+
+    new_voices = []
+    for i, voice in enumerate(voices):
+        new_voice = []
+        for j in range(desired_voice_length // voice_lengths[i]):
+            offset = j * voice_lengths[i]
+            for note in voice:
+                new_voice.append(
+                    replace(note, start=note.start + offset, end=note.end + offset)
+                )
+        new_voices.append(new_voice)
+
+    return new_voices
+
+
 def generate_voices(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice]:
     """
     In-order traversal of tree, generating a Note object for every
@@ -203,7 +243,7 @@ def parse_cycle_strings(cycle_strings: list[CycleString]) -> tuple[list[Voice], 
             voices[base_voice_idx:] = new_voices
             max_cycle_count = max(cycle_count, max_cycle_count)
 
-    # TODO someewhere in here, ensure that all stacks are the same length (this will fix stack test)
+    voices = normalize_voice_length(voices)
 
     return (voices, max_cycle_count)
 
