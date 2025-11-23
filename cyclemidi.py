@@ -199,8 +199,11 @@ def parse_cycle_strings(cycle_strings: list[CycleString]) -> tuple[list[Voice], 
             base_voice_idx = len(voices) - 1
         elif cycle_string_type == CycleStringType.NOTES:
             # TODO: add voice merging, voice count protection
-            (voices, cycle_count) = parse_cycles(cycle_string)
+            (new_voices, cycle_count) = parse_cycles(cycle_string)
+            voices[base_voice_idx:] = new_voices
             max_cycle_count = max(cycle_count, max_cycle_count)
+
+    # TODO someewhere in here, ensure that all stacks are the same length (this will fix stack test)
 
     return (voices, max_cycle_count)
 
