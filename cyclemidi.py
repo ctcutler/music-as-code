@@ -3,10 +3,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
 from enum import Enum, auto
-from midi import Config
 from typing import Any, Union, Optional
 from string import whitespace
 import re
+
+from mido import MidiFile, bpm2tempo, tick2second, MidiTrack, Message, MetaMessage  # type: ignore
+
+from midi import get_midi_note_and_velocity, play_midi, Config
 
 
 class CycleStringType(Enum):
@@ -148,7 +151,7 @@ def extend_voices(L: list[Voice], R: list[Voice]) -> list[Voice]:
     return z(z(L) + z(R))
 
 
-def generate_notes(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice]:
+def generate_voices(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice]:
     """
     In-order traversal of tree, generating a Note object for every
     leaf node with start and end set based on the provided start, end, and the number of
@@ -159,69 +162,112 @@ def generate_notes(tree: TreeNode, start: Fraction, end: Fraction) -> list[Voice
     child_count = len(tree.children)
     increment = Fraction((end - start) / child_count)
 
-    print(tree)
     for i, child in enumerate(tree.children):
         # all time ranges are start-inclusive and end-exclusive.
         child_start = i * increment
         child_end = (i + 1) * increment
 
         if isinstance(child, TreeNode):
-            child_voices = generate_notes(child, child_start, child_end)
+            child_voices = generate_voices(child, child_start, child_end)
             # TODO add polyphony support, e.g. mismatched numbers of voices
             voices = extend_voices(voices, child_voices)
         else:
             # TODO add polyphony support
-            voices[0].append(Note(child_start, child_end))
+            # TODO add support for setting velocity, width, offset
+            voices[0].append(Note(child_start, child_end, child))
 
     return voices
 
 
-def parse_cycles(cycle_string: str) -> list[Voice]:
-    """
-    So:
-    - treeify
-    - count elements at current level
-    - for each element at current level:
-      - if leaf:
-        set length
-      - if node:
-        recurse
-    """
+def parse_cycles(cycle_string: str) -> tuple[list[Voice], int]:
     expanded = expand_alternatives(cycle_string)
     cycles = split_cycles(expanded)
     cycle_tree = build_cycle_tree(cycles)
-    notes = generate_notes(cycle_tree, Fraction(0), Fraction(len(cycle_tree.children)))
+    cycle_count = len(cycle_tree.children)
+    voices = generate_voices(cycle_tree, Fraction(0), Fraction(cycle_count))
 
-    print(notes)
-
-    return notes
+    return (voices, cycle_count)
 
 
-def parse_cycle_strings(cycle_strings: list[CycleString]) -> list[Voice]:
+def parse_cycle_strings(cycle_strings: list[CycleString]) -> tuple[list[Voice], int]:
     voices: list[Voice] = [[]]
     base_voice_idx = 0
+    max_cycle_count = 0
     for cycle_string_type, cycle_string in cycle_strings:
         if cycle_string_type == CycleStringType.STACK:
             voices.append([])
             base_voice_idx = len(voices) - 1
         elif cycle_string_type == CycleStringType.NOTES:
-            parse_cycles(cycle_string)
-            # split cycles into notes
-            # append notes to voice(s)
+            # TODO: add voice merging, voice count protection
+            (voices, cycle_count) = parse_cycles(cycle_string)
+            max_cycle_count = max(cycle_count, max_cycle_count)
 
-    return voices
+    return (voices, max_cycle_count)
 
 
-def generate_midi(voices: list[Voice]) -> None:
-    pass
+def generate_midi(
+    voices: list[Voice], config: Config, cycle_count: int
+) -> tuple[MidiFile, int]:
+    mid = MidiFile()
+    channel = 0
+
+    ticks_per_cycle = mid.ticks_per_beat * config.beats_per_measure
+    tempo = bpm2tempo(config.beats_per_minute)
+
+    for voice in voices:
+        track = MidiTrack()
+        track.append(MetaMessage("set_tempo", tempo=tempo))
+
+        # it's important to remember here that note.start and note.end are
+        # absolute values from the beginning of the track, measured in
+        # number of cycles but the Message.time values are relative to
+        # time of the previous message
+
+        prev_note_end: float = 0  # contains _absolute_ time of prev note's note_off
+        for note in voice:
+            # don't update prev_note_end or append Messages for rest events
+            if note.pitch is not None:
+                note_duration = (note.end - note.start) * config.note_width
+                midi_note, velocity = get_midi_note_and_velocity(note.pitch)
+                if note.velocity is not None:
+                    velocity = note.velocity
+                track.append(
+                    Message(
+                        "note_on",
+                        channel=channel,
+                        note=midi_note,
+                        velocity=velocity,
+                        # delta from preceding note_off (or start of song)
+                        time=round((note.start - prev_note_end) * ticks_per_cycle),
+                    )
+                )
+                track.append(
+                    Message(
+                        "note_off",
+                        channel=channel,
+                        note=midi_note,
+                        velocity=velocity,
+                        # delta from preceding note_on
+                        time=round(note_duration * ticks_per_cycle),
+                    )
+                )
+                prev_note_end = note.start + note_duration
+
+        mid.tracks.append(track)
+        channel += 1
+
+    mid.save(config.midi_file_name)
+    total_secs = tick2second(cycle_count * ticks_per_cycle, mid.ticks_per_beat, tempo)
+
+    return (mid, total_secs)
 
 
 class Cycles:
     def __init__(self) -> None:
         self.cycle_strings: list[CycleString] = []
-        self.midi_file = None
-        self.total_secs = None
-        self.config = Config()
+        self.midi_file: Optional[MidiFile] = None
+        self.total_secs: int = 0
+        self.config: Config = Config()
 
     # "public" methods
     def notes(self, cycle_string: str) -> Cycles:
@@ -253,13 +299,15 @@ class Cycles:
         return self
 
     def midi(self) -> Cycles:
-        voices = parse_cycle_strings(self.cycle_strings)
-        generate_midi(voices)
+        (voices, cycle_count) = parse_cycle_strings(self.cycle_strings)
+        (self.midi_file, self.total_secs) = generate_midi(
+            voices, self.config, cycle_count
+        )
 
         return self
 
     def play(self) -> Cycles:
-        # play_midi(self.config, self.total_secs)
+        play_midi(self.config, self.total_secs)
 
         return self
 
