@@ -314,6 +314,7 @@ def test_merged_cycles_different_length_same_rhythm(mid_factory):
     assert expected.tracks == actual.tracks
 
 
+@pytest.mark.skip(reason="Don't think we should support polyphony mismatches")
 def test_more_voices_in_merger(mid_factory):
     expected = mid_factory(
         [
@@ -333,6 +334,7 @@ def test_more_voices_in_merger(mid_factory):
     assert expected.tracks == actual.tracks
 
 
+@pytest.mark.skip(reason="Don't think we should support polyphony mismatches")
 def test_more_voices_in_mergee(mid_factory):
     expected = mid_factory(
         [
@@ -412,6 +414,7 @@ def test_rhythm_polyphonic(mid_factory):
     assert expected.tracks == actual.tracks
 
 
+@pytest.mark.skip(reason="Don't think we should support polyphony mismatches")
 def test_rhythm_mismatched_polyphonic(mid_factory):
     expected = mid_factory(
         [

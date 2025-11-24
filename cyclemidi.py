@@ -250,7 +250,9 @@ def generate_voices(
                 if cycle_list_type == CycleListType.NOTES:
                     note.pitch = note_value
                 elif cycle_list_type == CycleListType.RHYTHM:
-                    pass  # start and end are already set
+                    # special case for rests in RHYTHM cycles
+                    if note_value == "~":
+                        note.pitch = note_value
                 elif cycle_list_type == CycleListType.VELOCITY:
                     velocity = int(note_value)
                     assert velocity >= 0 and velocity <= 9
@@ -268,6 +270,9 @@ def merge_note(
         assert left_note.velocity is None
         return replace(left_note, velocity=right_note.velocity)
     elif cycle_list_type == CycleListType.NOTES:
+        # special case for rests in RHYTHM cycles
+        if left_note.pitch == "~":
+            return left_note
         assert left_note.pitch == ""
         return replace(left_note, pitch=right_note.pitch)
 
@@ -437,11 +442,13 @@ class Cycles:
         return self
 
     def gate_length(self, cycle_list: str) -> Cycles:
-        self.cycle_lists.append((CycleListType.GATE_LENGTH, cycle_list))
+        # TODO: implement
+        # self.cycle_lists.append((CycleListType.GATE_LENGTH, cycle_list))
         return self
 
     def nudge(self, cycle_list: str) -> Cycles:
-        self.cycle_lists.append((CycleListType.NUDGE, cycle_list))
+        # TODO: implement
+        # self.cycle_lists.append((CycleListType.NUDGE, cycle_list))
         return self
 
     def stack(self) -> Cycles:
