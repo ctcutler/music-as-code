@@ -5,9 +5,15 @@ As I have added and refined features, the internal architecture of this tool has
 # TODO
 
 - [X] rough design
-- [ ] refactor/port tests to an actual testing framework
-- [ ] add infra for doing this with types
-- [ ] implement
+- [X] refactor/port tests to an actual testing framework
+- [X] add infra for doing this with types
+- [X] implement
+- [ ] clean up README.md
+- [ ] clean up obsolete test files
+---- after merge:
+- [ ] tied notes
+- [ ] gate_length
+- [ ] nudge
 
 # Major Functionality
 
