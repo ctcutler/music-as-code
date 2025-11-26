@@ -8,8 +8,8 @@ As I have added and refined features, the internal architecture of this tool has
 - [X] refactor/port tests to an actual testing framework
 - [X] add infra for doing this with types
 - [X] implement
-- [ ] clean up README.md
-- [ ] clean up obsolete test files
+- [X] clean up obsolete test files
+- [X] clean up README.md
 ---- after merge:
 - [ ] tied notes
 - [ ] gate_length
