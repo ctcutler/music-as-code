@@ -40,6 +40,9 @@ class Note:
 Voice = list[Note]
 CycleList = tuple[CycleListType, str]
 
+REST_LITERAL = "~"
+TIE_LITERAL = "-"
+
 ###
 # Note: the public interface (`Cycles`) is object-orented and "fluent" but the actual processing is done
 # in a series of "pure" functions defined at the module level.
@@ -216,7 +219,11 @@ def normalize_voice_length(
 
 
 def generate_voices(
-    tree: TreeNode, start: Fraction, end: Fraction, cycle_list_type: CycleListType
+    tree: TreeNode,
+    start: Fraction,
+    end: Fraction,
+    cycle_list_type: CycleListType,
+    parent_voices: list[Voice],
 ) -> list[Voice]:
     """
     In-order traversal of tree, generating a Note object for every
@@ -235,7 +242,7 @@ def generate_voices(
 
         if isinstance(child, TreeNode):
             child_voices = generate_voices(
-                child, child_start, child_end, cycle_list_type
+                child, child_start, child_end, cycle_list_type, voices
             )
             voices = extend_voices(voices, child_voices)
         else:
@@ -248,10 +255,20 @@ def generate_voices(
             for i, note_value in enumerate(note_values):
                 note = Note(child_start, child_end)
                 if cycle_list_type == CycleListType.NOTES:
-                    note.pitch = note_value
+                    if note_value == TIE_LITERAL:
+                        # for ties we figure out what the previous note was
+                        # in this voice and update its end, then continue
+                        if len(voices[i]) > 0:
+                            voices[i][-1].end += child_end - child_start
+                        else:
+                            assert len(parent_voices) > i and len(parent_voices[i])
+                            parent_voices[i][-1].end += child_end - child_start
+                        continue
+                    else:
+                        note.pitch = note_value
                 elif cycle_list_type == CycleListType.RHYTHM:
                     # special case for rests in RHYTHM cycles
-                    if note_value == "~":
+                    if note_value == REST_LITERAL:
                         note.pitch = note_value
                 elif cycle_list_type == CycleListType.VELOCITY:
                     velocity = int(note_value)
@@ -271,7 +288,7 @@ def merge_note(
         return replace(left_note, velocity=right_note.velocity)
     elif cycle_list_type == CycleListType.NOTES:
         # special case for rests in RHYTHM cycles
-        if left_note.pitch == "~":
+        if left_note.pitch == REST_LITERAL:
             return left_note
         assert left_note.pitch == ""
         return replace(left_note, pitch=right_note.pitch)
@@ -320,7 +337,7 @@ def parse_cycles(
     cycle_tree = build_cycle_tree(cycles)
     cycle_count = len(cycle_tree.children)
     voices = generate_voices(
-        cycle_tree, Fraction(0), Fraction(cycle_count), cycle_list_type
+        cycle_tree, Fraction(0), Fraction(cycle_count), cycle_list_type, [[]]
     )
 
     return (voices, cycle_count)
@@ -385,8 +402,21 @@ def generate_midi(
         prev_note_end: float = 0  # contains _absolute_ time of prev note's note_off
         for note in voice:
             # don't update prev_note_end or append Messages for rest events
-            if note.pitch != "~":
-                note_duration = (note.end - note.start) * config.note_width
+            if note.pitch != REST_LITERAL:
+                # index of start's cycle
+                start_cycle = floor(note.start)
+                end_floor = floor(note.end)
+                # index of end's cycle (note times, start->end, is endpoint exclusive)
+                end_cycle = end_floor - 1 if end_floor == note.end else end_floor
+                if start_cycle != end_cycle:
+                    # when a note spans multiple cycles we calculate the "width" of the note
+                    # based on the length of the portion in the final cycle
+                    note_duration = (end_floor - note.start) + (
+                        (note.end - end_floor) * config.note_width
+                    )
+                else:
+                    note_duration = (note.end - note.start) * config.note_width
+
                 midi_note, velocity = get_midi_note_and_velocity(note.pitch)
                 if note.velocity is not None:
                     velocity = note.velocity

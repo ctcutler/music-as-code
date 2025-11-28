@@ -117,6 +117,24 @@ that:
 ```
 
 This cycle plays B2, D3, F#3 on the first repeat and B2, D#3, F#3 on the second.
+
+We can add further rhythmic complexity with "tied" notes:
+
+```
+[ A4 C5 - D5 ]
+```
+
+In this example A4 plays for a quarter of the cycle then C5 for half the cycle then
+D5 for the final quarter.
+
+Tied notes between cycles are also possible:
+
+```
+[ A4 E5 ] [ - D5 ]
+```
+
+Here the E5 plays for the length of one cycle, the first half of it in the first 
+cycle and the rest in the second cycle.
  
 # API
 

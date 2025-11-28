@@ -469,3 +469,56 @@ def test_rhythm_mismatched_rests(mid_factory):
     )
     actual = rhythm("[x [~ x]]").notes("[A3] [B3]").midi().midi_file
     assert expected.tracks == actual.tracks
+
+
+def test_tie_within_cycle(mid_factory):
+    expected = mid_factory(
+        [
+            [
+                on("A4", 0),
+                off("A4", 240),
+                on("C5", 240),
+                off("C5", 480),
+                on("D5", 480),
+                off("D5", 240),
+            ],
+        ]
+    )
+    actual = notes("[ A4 C5 - D5 ]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+
+def test_tie_across_cycles(mid_factory):
+    expected = mid_factory(
+        [
+            [
+                on("A4", 0),
+                off("A4", 480),
+                on("E5", 480),
+                off("E5", 960 + 480),
+                on("D5", 480),
+                off("D5", 480),
+            ],
+        ]
+    )
+    actual = notes("[ A4 E5 ] [ - D5 ]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+
+def test_two_ties_across_cycles(mid_factory):
+    expected = mid_factory(
+        [
+            [
+                on("A4", 0),
+                off("A4", 480),
+                on("E5", 480),
+                off("E5", 960 + 480),
+                on("D5", 480),
+                off("D5", 240),
+                on("G4", 240),
+                off("G4", 240),
+            ],
+        ]
+    )
+    actual = notes("[ A4 E5 ] [ - - D5 G4 ]").midi().midi_file
+    assert expected.tracks == actual.tracks
