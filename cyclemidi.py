@@ -109,18 +109,18 @@ def add_cycle_to_tree(tokens: list[str], tree: TreeNode) -> int:
     token_count = len(tokens)
     while i < token_count:
         token = tokens[i]
-        if token == "[":  # this is subtree's open brackent
+        if token == "[":  # this is subtree's open bracket
             subtree = TreeNode([])
             tokens_consumed = add_cycle_to_tree(tokens[i + 1 :], subtree)
             tree.children.append(subtree)
             i += tokens_consumed + 1
-        elif token == "]":  # this  is tree's close bracket
-            return i
+        elif token == "]":  # this is tree's close bracket
+            return i + 1
         else:
             tree.children.append(token)
             i += 1
 
-    raise Exception(f"{tokens} has mismatched brackets")
+    return i
 
 
 def split_cycles(cycle_list: str) -> list[str]:

@@ -102,6 +102,39 @@ def test_three_level_nesting(mid_factory):
     assert expected.tracks == actual.tracks
 
 
+def test_nested_rests(mid_factory):
+    expected = mid_factory(
+        [
+            [
+                on("A3", 0),
+                off("A3", 320),
+                on("B3", 320),
+                off("B3", 320),
+                on("D3", 640),
+                off("D3", 160),
+            ]
+        ]
+    )
+    actual = notes("[A3 B3 [~ D3]]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+def test_nested_rests2(mid_factory):
+    expected = mid_factory(
+        [
+            [
+                on("A3", 0),
+                off("A3", 320),
+                on("D3", 640),
+                off("D3", 160),
+                on("B3", 160),
+                off("B3", 320),
+            ]
+        ]
+    )
+    actual = notes("[A3 [~ D3] B3]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+
 def test_crazy_whitespace(mid_factory):
     expected = mid_factory(
         [
