@@ -131,7 +131,11 @@ def split_cycles(cycle_list: str) -> list[str]:
     Lookahead and lookbehind groups ensure we preserve the brackets even while splitting
     on them.
     """
-    return re.split(r"(?<=\])\s*(?=\[)", cycle_list)
+    stripped_cycle_list = cycle_list.strip()
+    if stripped_cycle_list[0] == "[" and stripped_cycle_list[-1] == "]":
+        return [stripped_cycle_list]
+    else:
+        return re.split(r"(?<=\])\s*(?=\[)", cycle_list)
 
 
 def build_cycle_tree(cycles: list[str]) -> TreeNode:

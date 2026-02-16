@@ -59,8 +59,39 @@ def test_one_level_one_cycle(mid_factory):
     actual = notes("[A3 B3 C3]").midi().midi_file
     assert expected.tracks == actual.tracks
 
+def test_two_levels_one_cycle(mid_factory):
+    expected = mid_factory(
+        [
+            [
+                on("A3", 0),
+                off("A3", 320),
+                on("B3", 320),
+                off("B3", 320),
+                on("C3", 320),
+                off("C3", 320),
+            ]
+        ]
+    )
+    actual = notes("[ [A3] [B3] [C3] ]").midi().midi_file
+    assert expected.tracks == actual.tracks
 
 def test_one_level_three_cycles(mid_factory):
+    expected = mid_factory(
+        [
+            [
+                on("A3", 0),
+                off("A3", 960),
+                on("B3", 960),
+                off("B3", 960),
+                on("C3", 960),
+                off("C3", 960),
+            ]
+        ]
+    )
+    actual = notes("[A3] [B3] [C3]").midi().midi_file
+    assert expected.tracks == actual.tracks
+
+def test_one_level_three_cycles_alt(mid_factory):
     expected = mid_factory(
         [
             [
@@ -133,7 +164,6 @@ def test_nested_rests2(mid_factory):
     )
     actual = notes("[A3 [~ D3] B3]").midi().midi_file
     assert expected.tracks == actual.tracks
-
 
 def test_crazy_whitespace(mid_factory):
     expected = mid_factory(
